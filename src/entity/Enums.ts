@@ -22,3 +22,9 @@ export enum PaymentMethod {
   TRANSFERENCIA = "TRANSFERENCIA",
   DEPOSITO = "DEPOSITO"
 }
+
+export enum PaymentType {
+    FULL = "FULL",         // Pago completo de la mensualidad
+    PARTIAL = "PARTIAL",   // Pago de una parte (genera saldo pendiente)
+    DEFERRED = "DEFERRED"  // Pago aplazado (se compromete a pagar después)
+}

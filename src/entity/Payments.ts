@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne } from "typeorm";
 import { Client } from "./Client";
-import { PaymentMethod } from "./Enums";
+import { PaymentMethod, PaymentType } from "./Enums";
 
 @Entity()
 export class Payment {
@@ -23,10 +23,16 @@ export class Payment {
     })
     method!: PaymentMethod;
 
-    @CreateDateColumn()
-    createdAt!: Date; // Cuándo registraste el pago en el sistema
+    @Column({
+        type: "enum",
+        enum: PaymentType,
+        default: PaymentType.FULL
+    })
+    type!: PaymentType;
 
-    // Relación: Muchos Pagos pertenecen a Un Cliente
+    @CreateDateColumn()
+    createdAt!: Date; 
+
     @ManyToOne(() => Client, (client) => client.payments)
     client!: Client;
 }

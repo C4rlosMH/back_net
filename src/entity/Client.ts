@@ -28,6 +28,12 @@ export class Client {
     })
     status!: ClientStatus;
 
+   @Column({ default: 30 })
+    cutOffDay!: number; // Día 15 o 30
+
+    @Column("decimal", { precision: 10, scale: 2, default: 0 })
+    balance!: number; // Control de deudas o saldos a favor
+
     @CreateDateColumn()
     createdAt!: Date;
 

@@ -17,7 +17,11 @@ import UserRoutes from "./routes/User.Routes";
 const app = express();
 const PORT = process.env.PORT;
 
-app.use(cors());
+app.use(cors({
+  origin: '*', // Permite conexiones desde cualquier lugar (Útil para desarrollo)
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Usar rutas

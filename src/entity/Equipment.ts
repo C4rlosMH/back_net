@@ -7,6 +7,9 @@ export class Equipment {
     @PrimaryGeneratedColumn()
     id!: number;
 
+    @Column({ nullable: true })
+    name?: string;
+
     @Column({
         type: "enum",
         enum: EquipmentType
@@ -26,11 +29,11 @@ export class Equipment {
     @Column({ nullable: true })
     modelName?: string;
 
-    @Column({ unique: true })
-    sn!: string; // Serial Number
+   @Column({ unique: true, nullable: true })
+    sn?: string;
 
-    @Column({ unique: true })
-    mac!: string;
+    @Column({ unique: true, nullable: true })
+    mac?: string;
 
     // --- Credenciales del Equipo ---
     @Column({ default: "admin" })
@@ -65,4 +68,5 @@ export class Equipment {
 
     @UpdateDateColumn()
     updatedAt!: Date;
+
 }

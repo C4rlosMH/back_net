@@ -1,169 +1,114 @@
 import { Request, Response } from "express";
 import { AppDataSource } from "../data-source";
 import { Client } from "../entity/Client";
+import { Equipment } from "../entity/Equipment";
 import { Plan } from "../entity/Plan";
-import { Logger } from "../services/Logger";
+import { EquipmentStatus } from "../entity/Enums";
 
 export class ClientController {
+    private clientRepository = AppDataSource.getRepository(Client);
+    private equipmentRepository = AppDataSource.getRepository(Equipment);
+    private planRepository = AppDataSource.getRepository(Plan);
 
-    // --- 1. OBTENER TODOS ---
-    static getAll = async (req: Request, res: Response) => {
-        const clientRepo = AppDataSource.getRepository(Client);
+    async getAll(req: Request, res: Response) {
         try {
-            const clients = await clientRepo.find({
-                order: { id: "ASC" } // Ordenados por ID
+            // Traemos las relaciones para que el frontend pueda mostrar el nombre del plan y el S/N del equipo
+            const clients = await this.clientRepository.find({
+                relations: ["plan", "equipments"],
+                order: { id: "DESC" }
             });
-            res.json(clients);
+            return res.json(clients);
         } catch (error) {
-            res.status(500).json({ message: "Error al obtener clientes" });
+            return res.status(500).json({ message: "Error al obtener clientes" });
         }
-    };
+    }
 
-    // --- 2. CREAR ---
-    static create = async (req: Request, res: Response) => {
-        const { name, address, phone, coordinates, planId } = req.body;
-        
-        if (!name || !address) {
-             res.status(400).json({ message: "Nombre y dirección son obligatorios" });
-             return;
-        }
-
-        const clientRepo = AppDataSource.getRepository(Client);
-        const client = new Client();
-        client.name = name;
-        client.address = address;
-        client.phone = phone;
-        client.coordinates = coordinates;
-        // El status se pone en ACTIVO por defecto en la Entidad
-
-        if (planId) {
-            const planRepo = AppDataSource.getRepository(Plan);
-            const plan = await planRepo.findOneBy({ id: planId });
-            if (plan) {
-                client.plan = plan;
-            }
-        }
-
+    async create(req: Request, res: Response) {
         try {
-            await clientRepo.save(client);
-            res.status(201).json({ message: "Cliente creado", client });
-        } catch (error) {
-            res.status(500).json({ message: "Error al crear cliente" });
-        }
-    };
+            const { name, address, phone, cutOffDay, planId, equipmentId } = req.body;
 
-    // --- 3. OBTENER UNO POR ID (Nuevo) ---
-    static getById = async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const clientRepo = AppDataSource.getRepository(Client);
-        
-        try {
-            const client = await clientRepo.findOne({
-                where: { id: parseInt(id as string) },
-                relations: ["equipments"] // <--- ¡Magia! Trae sus equipos automáticamente
-            });
+            // 1. Validaciones iniciales
+            if (!planId) return res.status(400).json({ message: "El plan es obligatorio" });
 
-            if (!client) {
-                res.status(404).json({ message: "Cliente no encontrado" });
-                return;
-            }
-            res.json(client);
-        } catch (error) {
-            res.status(500).json({ message: "Error al buscar cliente" });
-        }
-    };
+            const plan = await this.planRepository.findOneBy({ id: planId });
+            if (!plan) return res.status(404).json({ message: "Plan no encontrado" });
 
-    // --- 4. ACTUALIZAR (Nuevo) ---
-    static update = async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const { name, address, phone, coordinates, status, planId } = req.body;
-        const clientRepo = AppDataSource.getRepository(Client);
-
-        try {
-            let client = await clientRepo.findOne({
-                where: { id: parseInt(id as string) },
-                relations: ["plan"] // Traemos el plan actual para comparar
-            });
-
-            if (!client) {
-                res.status(404).json({ message: "Cliente no encontrado" });
-                return;
-            }
-
-            // Datos básicos
-            client.name = name || client.name;
-            client.address = address || client.address;
-            client.phone = phone || client.phone;
-            client.coordinates = coordinates || client.coordinates;
-            client.status = status || client.status;
-
-            // --- LÓGICA DE PLAN CON LOG ---
-            if (planId) {
-                const planRepo = AppDataSource.getRepository(Plan);
-                const newPlan = await planRepo.findOneBy({ id: planId });
+            // 2. Iniciamos Transacción para asegurar la integridad
+            const result = await AppDataSource.transaction(async (transactionalEntityManager) => {
                 
-                if (newPlan) {
-                    const planAnterior = client.plan ? client.plan.name : "Sin Plan";
-                    client.plan = newPlan;
+                // Crear y guardar el cliente
+                const newClient = new Client();
+                newClient.name = name;
+                newClient.address = address;
+                newClient.phone = phone;
+                newClient.cutOffDay = cutOffDay || 30;
+                newClient.plan = plan;
+                newClient.balance = 0;
 
-                    // [NUEVO] Solo guardamos log si el plan realmente cambió
-                    if (planAnterior !== newPlan.name) {
-                        const userId = res.locals.jwtPayload.userId;
-                        await Logger.log(
-                            userId,
-                            "EDITAR",
-                            "CLIENTES",
-                            `Cliente #${id} cambió de plan: ${planAnterior} -> ${newPlan.name}`
-                        );
+                const savedClient = await transactionalEntityManager.save(newClient);
+
+                // 3. Si se seleccionó un equipo, lo vinculamos
+                if (equipmentId) {
+                    const equipment = await this.equipmentRepository.findOneBy({ id: equipmentId });
+                    
+                    if (equipment) {
+                        // Verificamos si el equipo no está ya ocupado (opcional pero recomendado)
+                        equipment.client = savedClient;
+                        equipment.status = EquipmentStatus.INSTALADO;
+                        await transactionalEntityManager.save(equipment);
                     }
                 }
-            }
 
-            await clientRepo.save(client);
-            res.json({ message: "Cliente actualizado", client });
-        } catch (error) {
-            res.status(500).json({ message: "Error al actualizar cliente" });
-        }
-    };
-
-    // --- 5. ELIMINAR (Nuevo) ---
-    static delete = async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const clientRepo = AppDataSource.getRepository(Client);
-
-        try {
-            // 1. Primero buscamos al cliente para saber CÓMO se llama antes de borrarlo
-            const client = await clientRepo.findOneBy({ id: parseInt(id as string) });
-
-            if (!client) {
-                res.status(404).json({ message: "Cliente no encontrado" });
-                return;
-            }
-
-            // 2. Intentamos borrarlo
-            await clientRepo.remove(client);
-
-            // 3. SI SE BORRÓ CON ÉXITO -> Guardamos el Log
-            // Aquí respondemos tus dos preguntas:
-            // ¿Quién fue? -> userId (obtenido del token)
-            // ¿A quién eliminó? -> client.name (guardado en la variable antes de borrar)
-            
-            const userId = res.locals.jwtPayload.userId;
-            
-            await Logger.log(
-                userId,
-                "ELIMINAR",
-                "CLIENTES",
-                `Eliminó permanentemente al cliente: ${client.name} (ID: ${id})`
-            );
-            
-            res.json({ message: "Cliente eliminado correctamente" });
-
-        } catch (error) {
-            // Si falla (ej. tiene pagos o equipos), no se guarda el log porque no se borró
-            res.status(500).json({ 
-                message: "No se puede eliminar: El cliente tiene equipos o pagos registrados." 
+                return savedClient;
             });
+
+            return res.status(201).json(result);
+
+        } catch (error) {
+            console.error("Error en Create Client:", error);
+            return res.status(500).json({ message: "Error interno al crear cliente" });
         }
-    };
+    }
+
+    async delete(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const client = await this.clientRepository.findOne({
+                where: { id: Number(id) },
+                relations: ["equipments"]
+            });
+
+            if (!client) return res.status(404).json({ message: "Cliente no encontrado" });
+
+            // Antes de borrar, liberamos los equipos (vuelven a bodega)
+            await AppDataSource.transaction(async (manager) => {
+                if (client.equipments && client.equipments.length > 0) {
+                    for (const eq of client.equipments) {
+                        eq.status = EquipmentStatus.BODEGA;
+                        eq.client = null as any;
+                        await manager.save(eq);
+                    }
+                }
+                await manager.remove(client);
+            });
+
+            return res.json({ message: "Cliente eliminado y equipos devueltos a bodega" });
+        } catch (error) {
+            return res.status(500).json({ message: "Error al eliminar cliente" });
+        }
+    }
+
+    async update(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const updateData = req.body;
+            
+            await this.clientRepository.update(id, updateData);
+            const updatedClient = await this.clientRepository.findOneBy({ id: Number(id) });
+            
+            return res.json(updatedClient);
+        } catch (error) {
+            return res.status(500).json({ message: "Error al actualizar cliente" });
+        }
+    }
 }
