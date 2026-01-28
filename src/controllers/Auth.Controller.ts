@@ -6,38 +6,6 @@ import jwt from "jsonwebtoken"; // <--- Importamos esto
 
 export class UserController {
 
-    static register = async (req: Request, res: Response) => {
-        const { username, password, name, role } = req.body;
-
-        if (!username || !password || !name) {
-             res.status(400).json({ message: "Faltan datos obligatorios" });
-             return; 
-        }
-
-        const userRepository = AppDataSource.getRepository(User);
-        const userExist = await userRepository.findOneBy({ username });
-
-        if (userExist) {
-             res.status(409).json({ message: "El usuario ya existe" });
-             return; 
-        }
-
-        const user = new User();
-        user.username = username;
-        user.name = name;
-        user.role = role || 'TECNICO';
-        
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-
-        try {
-            await userRepository.save(user);
-            res.status(201).json({ message: "Usuario creado exitosamente" });
-        } catch (error) {
-            res.status(500).json({ message: "Error al guardar usuario" });
-        }
-    };
-
     // --- 2. LOGIN (Ya lo tenías) ---
     static login = async (req: Request, res: Response) => {
         const { username, password } = req.body;
@@ -140,6 +108,43 @@ export class UserController {
         } catch (error) {
             res.status(500).json({ message: "Error al eliminar" });
         }
+    };
+
+    static changePassword = async (req: Request, res: Response) => {
+        // Obtenemos el ID del usuario desde el Token (gracias al middleware checkJwt)
+        const id = res.locals.jwtPayload.userId;
+        const { oldPassword, newPassword } = req.body;
+
+        if (!oldPassword || !newPassword) {
+             res.status(400).json({ message: "Se requieren contraseña actual y nueva" });
+             return;
+        }
+
+        const userRepository = AppDataSource.getRepository(User);
+        let user: User | null;
+        try {
+            user = await userRepository.findOneBy({ id });
+        } catch (error) {
+            res.status(500).json({ message: "Error al buscar usuario" });
+            return;
+        }
+
+        if (!user) {
+            res.status(404).json({ message: "Usuario no encontrado" });
+            return;
+        }
+
+        // Verificar que la contraseña anterior sea correcta
+        if (!(await bcrypt.compare(oldPassword, user.password))) {
+             res.status(401).json({ message: "La contraseña anterior no coincide" });
+             return;
+        }
+
+        // Encriptar y guardar la nueva
+        user.password = await bcrypt.hash(newPassword, 10);
+        await userRepository.save(user);
+
+        res.json({ message: "Contraseña actualizada correctamente" });
     };
 
 }

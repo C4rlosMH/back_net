@@ -5,7 +5,6 @@ import { checkJwt } from "../middlewares/auth.middleware";
 const router = Router();
 
 // Rutas Públicas (Auth)
-//router.post("/register", UserController.register);
 router.post("/login", UserController.login);
 
 // Rutas Privadas (Solo con Token)
@@ -14,4 +13,6 @@ router.get("/", [checkJwt], UserController.getAll);
 router.get("/:id", [checkJwt], UserController.getById);   
 router.put("/:id", [checkJwt], UserController.update);    
 router.delete("/:id", [checkJwt], UserController.delete);
+router.post("/", [checkJwt], UserController.changePassword)
+
 export default router;
