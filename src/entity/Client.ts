@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, Ma
 import { ClientStatus } from "./Enums"; // Asegúrate de tener este archivo creado
 import { Equipment } from "./Equipment"; // Importamos la clase Equipment
 import { Plan } from "./Plan";
+import { Payment } from "./Payments";
 
 @Entity()
 export class Client {
@@ -37,4 +38,7 @@ export class Client {
 
     @ManyToOne(() => Plan, (plan) => plan.clients, { nullable: true })
     plan?: Plan;
+
+    @OneToMany(() => Payment, (payment) => payment.client)
+    payments!: Payment[];
 }

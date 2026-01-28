@@ -7,6 +7,9 @@ import { AppDataSource } from "./data-source";
 import AuthRoutes from "./routes/Auth.Routes";
 import ClientRoutes from "./routes/Client.Routes";
 import equipmentRoutes from "./routes/Equipment.Routes";
+import PlanRoutes from "./routes/Plan.Routes";
+import PaymentRoutes from "./routes/Payment.Routes";
+import SystemLogRoutes from "./routes/SystemLog.Routes";
 
 const app = express();
 const PORT = process.env.PORT;
@@ -18,6 +21,9 @@ app.use(express.json());
 app.use("/api/auth", AuthRoutes);
 app.use("/api/clients", ClientRoutes);
 app.use("/api/equipments", equipmentRoutes);
+app.use("/api/plans", PlanRoutes);
+app.use("/api/payments", PaymentRoutes);
+app.use("/api/logs", SystemLogRoutes);
 
 
 // Inicializar Base de Datos y luego el Servidor

@@ -16,3 +16,9 @@ export enum EquipmentStatus {
   AVERIADO = "AVERIADO",
   RETIRADO = "RETIRADO"
 }
+
+export enum PaymentMethod {
+  EFECTIVO = "EFECTIVO",
+  TRANSFERENCIA = "TRANSFERENCIA",
+  DEPOSITO = "DEPOSITO"
+}

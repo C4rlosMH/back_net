@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AppDataSource } from "../data-source";
 import { Client } from "../entity/Client";
 import { Plan } from "../entity/Plan";
+import { Logger } from "../services/Logger";
 
 export class ClientController {
 
@@ -75,23 +76,48 @@ export class ClientController {
     // --- 4. ACTUALIZAR (Nuevo) ---
     static update = async (req: Request, res: Response) => {
         const { id } = req.params;
-        const { name, address, phone, coordinates, status } = req.body;
+        const { name, address, phone, coordinates, status, planId } = req.body;
         const clientRepo = AppDataSource.getRepository(Client);
 
         try {
-            let client = await clientRepo.findOneBy({ id: parseInt(id as string) });
+            let client = await clientRepo.findOne({
+                where: { id: parseInt(id as string) },
+                relations: ["plan"] // Traemos el plan actual para comparar
+            });
 
             if (!client) {
                 res.status(404).json({ message: "Cliente no encontrado" });
                 return;
             }
 
-            // Actualizamos solo lo que envíen
+            // Datos básicos
             client.name = name || client.name;
             client.address = address || client.address;
             client.phone = phone || client.phone;
             client.coordinates = coordinates || client.coordinates;
-            client.status = status || client.status; // Para cambiar a SUSPENDIDO o RETIRADO
+            client.status = status || client.status;
+
+            // --- LÓGICA DE PLAN CON LOG ---
+            if (planId) {
+                const planRepo = AppDataSource.getRepository(Plan);
+                const newPlan = await planRepo.findOneBy({ id: planId });
+                
+                if (newPlan) {
+                    const planAnterior = client.plan ? client.plan.name : "Sin Plan";
+                    client.plan = newPlan;
+
+                    // [NUEVO] Solo guardamos log si el plan realmente cambió
+                    if (planAnterior !== newPlan.name) {
+                        const userId = res.locals.jwtPayload.userId;
+                        await Logger.log(
+                            userId,
+                            "EDITAR",
+                            "CLIENTES",
+                            `Cliente #${id} cambió de plan: ${planAnterior} -> ${newPlan.name}`
+                        );
+                    }
+                }
+            }
 
             await clientRepo.save(client);
             res.json({ message: "Cliente actualizado", client });
@@ -106,17 +132,38 @@ export class ClientController {
         const clientRepo = AppDataSource.getRepository(Client);
 
         try {
-            const result = await clientRepo.delete(id);
+            // 1. Primero buscamos al cliente para saber CÓMO se llama antes de borrarlo
+            const client = await clientRepo.findOneBy({ id: parseInt(id as string) });
 
-            if (result.affected === 0) {
+            if (!client) {
                 res.status(404).json({ message: "Cliente no encontrado" });
                 return;
             }
+
+            // 2. Intentamos borrarlo
+            await clientRepo.remove(client);
+
+            // 3. SI SE BORRÓ CON ÉXITO -> Guardamos el Log
+            // Aquí respondemos tus dos preguntas:
+            // ¿Quién fue? -> userId (obtenido del token)
+            // ¿A quién eliminó? -> client.name (guardado en la variable antes de borrar)
+            
+            const userId = res.locals.jwtPayload.userId;
+            
+            await Logger.log(
+                userId,
+                "ELIMINAR",
+                "CLIENTES",
+                `Eliminó permanentemente al cliente: ${client.name} (ID: ${id})`
+            );
             
             res.json({ message: "Cliente eliminado correctamente" });
+
         } catch (error) {
-            // Si el cliente tiene equipos, la BD no dejará borrarlo (Integridad Referencial)
-            res.status(500).json({ message: "No se puede eliminar: el cliente tiene equipos asignados o hubo un error." });
+            // Si falla (ej. tiene pagos o equipos), no se guarda el log porque no se borró
+            res.status(500).json({ 
+                message: "No se puede eliminar: El cliente tiene equipos o pagos registrados." 
+            });
         }
     };
 }
