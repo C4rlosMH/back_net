@@ -2,6 +2,7 @@ import "reflect-metadata";
 import express from "express";
 import cors from "cors";
 import { AppDataSource } from "./data-source";
+import { seedDatabase } from "./utils/seed";
 
 //importar rutas
 import AuthRoutes from "./routes/Auth.Routes";
@@ -32,9 +33,8 @@ app.use("/api/users", UserRoutes);
 
 // Inicializar Base de Datos y luego el Servidor
 AppDataSource.initialize()
-    .then(() => {
-        console.log("Base de Datos conectada con TypeORM");
-        
+    .then(async() => {
+        await seedDatabase();
         app.listen(PORT, () => {
             console.log(`Servidor corriendo en http://localhost:${PORT}`);
         });
