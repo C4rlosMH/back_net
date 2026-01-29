@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import { AppDataSource } from "./data-source";
 import { seedDatabase } from "./utils/seed";
+import { datasDatabase } from "./utils/datas";  
+
 
 //importar rutas
 import AuthRoutes from "./routes/Auth.Routes";
@@ -39,6 +41,7 @@ app.use("/api/users", UserRoutes);
 AppDataSource.initialize()
     .then(async() => {
         await seedDatabase();
+        await datasDatabase();
         app.listen(PORT, () => {
             console.log(`Servidor corriendo en http://localhost:${PORT}`);
         });
