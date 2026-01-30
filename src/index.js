@@ -19,7 +19,10 @@ dotenv.config();
 const app = express();
 
 // Middlewares Globales
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // O el puerto de tu frontend
+    credentials: true
+}));
 app.use(express.json());
 
 // Usar rutas

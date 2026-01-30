@@ -8,6 +8,11 @@ export const Cliente = new EntitySchema({
         nombre_completo: { type: "varchar" },
         telefono: { type: "varchar" },
         direccion: { type: "text", nullable: true },
+
+        dia_pago: { 
+            type: "int", 
+            default: 15  // Por defecto paga el 15
+        },
         
         // Mapa
         latitud: { type: "float", precision: 10, scale: 6, nullable: true },
