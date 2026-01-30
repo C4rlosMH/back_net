@@ -47,3 +47,20 @@ export const togglePlan = async (req, res) => {
         return res.status(500).json({ message: error.message });
     }
 };
+
+export const updatePlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const plan = await planRepo.findOneBy({ id: parseInt(id) });
+
+        if (!plan) return res.status(404).json({ message: "Plan no encontrado" });
+
+        // Actualizamos los campos recibidos
+        planRepo.merge(plan, req.body);
+        
+        await planRepo.save(plan);
+        res.json(plan);
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
