@@ -13,6 +13,7 @@ import pagoRoutes from "./routes/pago.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import planRoutes from "./routes/plan.routes.js";
 
 dotenv.config();
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api/pagos", pagoRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/planes", planRoutes);
 
 const PORT = process.env.PORT;
 
