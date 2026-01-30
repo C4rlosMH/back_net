@@ -7,6 +7,8 @@ import { AppDataSource } from "./config/data-source.js";
 //importar rutas
 import clienteRoutes from "./routes/cliente.routes.js";
 import equipoRoutes from "./routes/equipo.routes.js";
+import pagoRoutes from "./routes/pago.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
 
 dotenv.config();
 const app = express();
@@ -18,6 +20,8 @@ app.use(express.json());
 // Usar rutas
 app.use("/api/clientes", clienteRoutes);
 app.use("/api/equipos", equipoRoutes);
+app.use("/api/pagos", pagoRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 const PORT = process.env.PORT;
 
