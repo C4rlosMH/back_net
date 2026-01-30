@@ -11,5 +11,6 @@ router.get("/", [checkJwt], (req: any, res: any) => clientCtrl.getAll(req, res))
 router.post("/", [checkJwt], (req: any, res: any) => clientCtrl.create(req, res));
 router.put("/:id", [checkJwt], (req: any, res: any) => clientCtrl.update(req, res));
 router.delete("/:id", [checkJwt], (req: any, res: any) => clientCtrl.delete(req, res));
+router.get("/:id", [checkJwt], (req: any, res: any) => clientCtrl.getOne(req, res));
 
 export default router;

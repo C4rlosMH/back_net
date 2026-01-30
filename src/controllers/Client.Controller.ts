@@ -111,4 +111,24 @@ export class ClientController {
             return res.status(500).json({ message: "Error al actualizar cliente" });
         }
     }
+    async getOne(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const client = await this.clientRepository.findOne({
+                where: { id: Number(id) },
+                relations: ["plan", "equipments", "payments"], // <--- Traemos todo
+                order: {
+                    payments: {
+                        paymentDate: "DESC" // Los pagos más recientes primero
+                    }
+                }
+            });
+
+            if (!client) return res.status(404).json({ message: "Cliente no encontrado" });
+
+            return res.json(client);
+        } catch (error) {
+            return res.status(500).json({ message: "Error al obtener detalles del cliente" });
+        }
+    }
 }

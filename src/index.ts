@@ -15,6 +15,7 @@ import PaymentRoutes from "./routes/Payment.Routes";
 import SystemLogRoutes from "./routes/SystemLog.Routes";
 import ReportRoutes from "./routes/Report.routes";
 import UserRoutes from "./routes/User.Routes";
+import StatsRoutes from "./routes/Stats.Routes";
 
 const app = express();
 const PORT = process.env.PORT;
@@ -35,6 +36,7 @@ app.use("/api/payments", PaymentRoutes);
 app.use("/api/logs", SystemLogRoutes);
 app.use("/api/reports", ReportRoutes);
 app.use("/api/users", UserRoutes);
+app.use("/api/stats", StatsRoutes);
 
 
 // Inicializar Base de Datos y luego el Servidor
