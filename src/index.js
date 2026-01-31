@@ -46,7 +46,7 @@ async function main() {
 
         await createAdminUser();
 
-        await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA
+        //await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA
         // 2. Iniciar Servidor Express
         app.listen(PORT, () => {
             console.log(`Servidor corriendo en http://localhost:${PORT}`);

@@ -5,6 +5,7 @@ export const Equipo = new EntitySchema({
     tableName: "equipos",
     columns: {
         id: { primary: true, type: "int", generated: true },
+        nombre: { type: "varchar", nullable: true },
         tipo: { 
             type: "enum", 
             enum: ["ANTENA", "ROUTER", "MODEM"], 

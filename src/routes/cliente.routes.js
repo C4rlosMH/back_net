@@ -1,10 +1,22 @@
 import { Router } from "express";
-import { createCliente, getClientes } from "../controllers/cliente.controller.js";
+import { 
+    createCliente, 
+    getClientes, 
+    updateCliente, // <--- Importar
+    deleteCliente, // <--- Importar
+    getCliente     // <--- Importar
+} from "../controllers/cliente.controller.js";
 import { checkAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.post("/", checkAuth, createCliente); // POST http://localhost:3000/api/clientes
-router.get("/", checkAuth, getClientes);    // GET http://localhost:3000/api/clientes
+// Rutas base
+router.post("/", checkAuth, createCliente);
+router.get("/", checkAuth, getClientes);
+
+// --- Rutas que faltaban (ID requerido) ---
+router.get("/:id", checkAuth, getCliente);
+router.put("/:id", checkAuth, updateCliente);    // <--- Esta arregla el error 404
+router.delete("/:id", checkAuth, deleteCliente);
 
 export default router;
