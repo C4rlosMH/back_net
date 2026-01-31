@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { getDashboard } from "../controllers/dashboard.controller.js";
+// ⚠️ CORRECCIÓN: Importamos 'getDashboardStats' (no getDashboard)
+import { getDashboardStats } from "../controllers/dashboard.controller.js";
 import { checkAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-// GET /api/dashboard
-router.get("/",checkAuth, getDashboard);
+// ⚠️ CORRECCIÓN: Usamos la ruta "/stats" para que coincida con el frontend
+// URL Final: /api/dashboard/stats
+router.get("/stats", checkAuth, getDashboardStats);
 
 export default router;
