@@ -14,6 +14,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import planRoutes from "./routes/plan.routes.js";
+import cajaRoutes from "./routes/caja.routes.js";
 
 dotenv.config();
 const app = express();
@@ -33,6 +34,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/planes", planRoutes);
+app.use("/api/cajas", cajaRoutes);
 
 const PORT = process.env.PORT;
 

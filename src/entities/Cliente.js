@@ -6,31 +6,21 @@ export const Cliente = new EntitySchema({
     columns: {
         id: { primary: true, type: "int", generated: true },
         nombre_completo: { type: "varchar" },
-        telefono: { type: "varchar" },
+        telefono: { type: "varchar", nullable: true }, // <--- Agregué nullable por si acaso
         direccion: { type: "text", nullable: true },
-
-        dia_pago: { 
-            type: "int", 
-            default: 15  // Por defecto paga el 15
-        },
+        dia_pago: { type: "int", default: 15 },
         
-        // Mapa
-        latitud: { type: "float", precision: 10, scale: 6, nullable: true },
-        longitud: { type: "float", precision: 10, scale: 6, nullable: true },
+        latitud: { type: "float", nullable: true }, // <--- Simplificado
+        longitud: { type: "float", nullable: true }, // <--- Simplificado
 
-        // Estado y Finanzas
         estado: { 
             type: "enum", 
             enum: ["ACTIVO", "SUSPENDIDO", "CORTADO", "BAJA"], 
             default: "ACTIVO" 
         },
         dia_corte: { type: "int", default: 1 }, 
-        saldo_actual: { 
-            type: "decimal", 
-            precision: 10, 
-            scale: 2, 
-            default: 0.00 
-        }, 
+        saldo_actual: { type: "decimal", precision: 10, scale: 2, default: 0.00 }, 
+        fecha_instalacion: { type: "date", nullable: true }, // <--- Agregado (útil para el front)
 
         createdAt: { createDate: true },
     },
@@ -38,20 +28,21 @@ export const Cliente = new EntitySchema({
         plan: {
             type: "many-to-one",
             target: "Plan",
-            joinColumn: true,
-            inverseSide: "clientes",
+            joinColumn: { name: "planId" }, // <--- Especificar nombre ayuda a evitar errores
+            nullable: true
         },
-        cajaConectada: { // Relación con la Caja del poste
+        // --- CAMBIO IMPORTANTE: DE "cajaConectada" A "caja" ---
+        caja: { 
             type: "many-to-one",
             target: "CajaDistribucion",
             joinColumn: { name: "cajaId" },
-            nullable: true,
-            inverseSide: "clientes",
+            nullable: true
         },
         equipos: {
-            type: "one-to-many",
+            type: "one-to-one", // Usualmente un cliente tiene 1 equipo, verifica si es one-to-many en tu lógica
             target: "Equipo",
-            inverseSide: "cliente",
+            joinColumn: { name: "equipoId" },
+            nullable: true
         },
         movimientos: {
             type: "one-to-many",
