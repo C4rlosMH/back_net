@@ -15,7 +15,7 @@ export const CajaDistribucion = new EntitySchema({
         clientes: {
             type: "one-to-many",
             target: "Cliente",
-            inverseSide: "cajaConectada",
+            inverseSide: "caja", // [CORREGIDO] Debe coincidir con la propiedad 'caja' en Cliente.js
         },
     },
 });

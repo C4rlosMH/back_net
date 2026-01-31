@@ -38,7 +38,7 @@ export const Cliente = new EntitySchema({
             joinColumn: { name: "cajaId" },
             nullable: true
         },
-        equipos: {
+        equipo: {
             type: "one-to-one", // Usualmente un cliente tiene 1 equipo, verifica si es one-to-many en tu lógica
             target: "Equipo",
             joinColumn: { name: "equipoId" },
