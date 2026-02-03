@@ -29,3 +29,12 @@ export const getHistorial = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const getPagosGlobales = async (req, res) => {
+    try {
+        const historial = await getMovimientosGlobalesService();
+        res.json(historial);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

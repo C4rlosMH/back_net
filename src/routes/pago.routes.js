@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { generarCargo, registrarPago, getHistorial } from "../controllers/pago.controller.js";
+import { generarCargo, registrarPago, getHistorial, getPagosGlobales } from "../controllers/pago.controller.js";
 import { checkAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
+
+router.get("/", checkAuth, getPagosGlobales);
 
 // POST /api/pagos/cargo -> Generar deuda manualmente (simulacro de corte)
 router.post("/cargo", checkAuth, generarCargo);

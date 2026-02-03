@@ -49,30 +49,41 @@ export const generarCargoMensualService = async (clienteId) => {
 
 // 2. REGISTRAR PAGO (Abono)
 export const registrarPagoService = async (data) => {
-    // data = { clienteId, monto, metodo_pago, referencia }
+    // data = { clienteId, monto, metodo_pago, referencia, mes_servicio, tipo_pago }
     
     const cliente = await clienteRepository.findOne({ where: { id: data.clienteId } });
     if (!cliente) throw new Error("Cliente no encontrado");
 
     const montoPago = Number(data.monto);
 
+    // Construir descripción automática si no viene una
+    let desc = data.descripcion;
+    if (!desc) {
+        if (data.tipo_pago === 'LIQUIDACION') desc = `Pago Completo - ${data.mes_servicio || 'Saldo Pendiente'}`;
+        else if (data.tipo_pago === 'APLAZADO') desc = `Pago Aplazado/Promesa - ${data.mes_servicio}`;
+        else desc = `Abono a cuenta - ${data.mes_servicio || 'General'}`;
+    }
+
     // Crear registro del pago
     const pago = movimientoRepository.create({
         tipo: "ABONO",
         monto: montoPago,
-        descripcion: data.referencia || "Pago de servicio",
-        metodo_pago: data.metodo_pago,
+        descripcion: desc,
+        mes_servicio: data.mes_servicio || null, // Guardamos el mes
+        metodo_pago: data.metodo_pago || "EFECTIVO",
         cliente: cliente
     });
 
-    // Actualizar saldo
-    cliente.saldo_actual = Number(cliente.saldo_actual) - montoPago;
-
-    if (cliente.saldo_actual <= 0 && cliente.estado === "CORTADO") {
-        cliente.estado = "ACTIVO"; 
+    // Actualizar saldo (Solo si no es promesa de pago con monto 0)
+    if (montoPago > 0) {
+        cliente.saldo_actual = Number(cliente.saldo_actual) - montoPago;
+        
+        // Reactivación automática si paga todo
+        if (cliente.saldo_actual <= 0 && cliente.estado === "CORTADO") {
+            cliente.estado = "ACTIVO"; 
+        }
     }
 
-    // --- CORRECCIÓN AQUÍ ---
     await AppDataSource.manager.transaction(async (manager) => {
         await manager.save(MovimientoFinanciero, pago);
         await manager.save(Cliente, cliente);
@@ -80,7 +91,6 @@ export const registrarPagoService = async (data) => {
 
     return {
         mensaje: "Pago registrado exitosamente",
-        pago_aplicado: montoPago,
         saldo_restante: cliente.saldo_actual 
     };
 };
@@ -100,4 +110,12 @@ export const getHistorialPagosService = async (clienteId) => {
         saldo_actual: cliente.saldo_actual,
         historial: movimientos
     };
+};
+
+export const getMovimientosGlobalesService = async () => {
+    return await movimientoRepository.find({
+        relations: ["cliente"], // Trae los datos del cliente (nombre, etc.)
+        order: { fecha: "DESC" },
+        take: 100 // Limita a los últimos 100 para no saturar
+    });
 };

@@ -5,6 +5,7 @@ export const MovimientoFinanciero = new EntitySchema({
     tableName: "movimientos_financieros",
     columns: {
         id: { primary: true, type: "int", generated: true },
+        mes_servicio: { type: "varchar", nullable: true }, // Ej: "Enero 2024"
         
         tipo: { 
             type: "enum", 
