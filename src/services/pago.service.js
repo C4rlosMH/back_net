@@ -49,36 +49,38 @@ export const generarCargoMensualService = async (clienteId) => {
 
 // 2. REGISTRAR PAGO (Abono)
 export const registrarPagoService = async (data) => {
-    // data = { clienteId, monto, metodo_pago, referencia, mes_servicio, tipo_pago }
+    // data = { clienteId, monto, metodo_pago, tipo_pago, mes_servicio, referencia }
     
     const cliente = await clienteRepository.findOne({ where: { id: data.clienteId } });
     if (!cliente) throw new Error("Cliente no encontrado");
 
     const montoPago = Number(data.monto);
 
-    // Construir descripción automática si no viene una
-    let desc = data.descripcion;
-    if (!desc) {
-        if (data.tipo_pago === 'LIQUIDACION') desc = `Pago Completo - ${data.mes_servicio || 'Saldo Pendiente'}`;
-        else if (data.tipo_pago === 'APLAZADO') desc = `Pago Aplazado/Promesa - ${data.mes_servicio}`;
-        else desc = `Abono a cuenta - ${data.mes_servicio || 'General'}`;
+    // 1. Generar descripción automática basada en el tipo
+    let desc = data.referencia || "Abono general";
+    
+    if (data.tipo_pago === 'LIQUIDACION') {
+        desc = `Liquidación Total - ${data.mes_servicio || 'Saldo Pendiente'}`;
+    } else if (data.tipo_pago === 'APLAZADO') {
+        desc = `Promesa de Pago - ${data.mes_servicio}`;
+    } else if (data.mes_servicio) {
+        desc = `Abono Mes: ${data.mes_servicio}`;
     }
 
-    // Crear registro del pago
+    // 2. Crear registro
     const pago = movimientoRepository.create({
         tipo: "ABONO",
         monto: montoPago,
         descripcion: desc,
-        mes_servicio: data.mes_servicio || null, // Guardamos el mes
+        mes_servicio: data.mes_servicio || null,
         metodo_pago: data.metodo_pago || "EFECTIVO",
         cliente: cliente
     });
 
-    // Actualizar saldo (Solo si no es promesa de pago con monto 0)
+    // 3. Actualizar saldo (Solo si hay dinero real, no promesas)
     if (montoPago > 0) {
         cliente.saldo_actual = Number(cliente.saldo_actual) - montoPago;
-        
-        // Reactivación automática si paga todo
+        // Reactivación automática si paga todo y estaba cortado
         if (cliente.saldo_actual <= 0 && cliente.estado === "CORTADO") {
             cliente.estado = "ACTIVO"; 
         }
@@ -89,10 +91,7 @@ export const registrarPagoService = async (data) => {
         await manager.save(Cliente, cliente);
     });
 
-    return {
-        mensaje: "Pago registrado exitosamente",
-        saldo_restante: cliente.saldo_actual 
-    };
+    return { mensaje: "Pago registrado exitosamente", saldo_restante: cliente.saldo_actual };
 };
 
 // 3. VER ESTADO DE CUENTA
