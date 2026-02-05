@@ -1,4 +1,9 @@
-import { generarCargoMensualService, registrarPagoService, getHistorialPagosService } from "../services/pago.service.js";
+import { 
+    generarCargoMensualService, 
+    registrarPagoService, 
+    getHistorialPagosService,
+    getMovimientosGlobalesService // <--- ¡AGREGA ESTO!
+} from "../services/pago.service.js";
 
 export const generarCargo = async (req, res) => {
     try {
@@ -12,7 +17,6 @@ export const generarCargo = async (req, res) => {
 
 export const registrarPago = async (req, res) => {
     try {
-        // Esperamos: { clienteId: 1, monto: 300, metodo_pago: "EFECTIVO" }
         const resultado = await registrarPagoService(req.body);
         res.json(resultado);
     } catch (error) {
@@ -22,7 +26,7 @@ export const registrarPago = async (req, res) => {
 
 export const getHistorial = async (req, res) => {
     try {
-        const { id } = req.params; // Viene de la URL /api/pagos/historial/:id
+        const { id } = req.params;
         const historial = await getHistorialPagosService(id);
         res.json(historial);
     } catch (error) {
@@ -32,9 +36,11 @@ export const getHistorial = async (req, res) => {
 
 export const getPagosGlobales = async (req, res) => {
     try {
+        // Ahora sí funcionará porque la importamos arriba
         const historial = await getMovimientosGlobalesService();
         res.json(historial);
     } catch (error) {
+        // Aquí es donde caía el error "getMovimientosGlobalesService is not defined"
         res.status(500).json({ message: error.message });
     }
 };
