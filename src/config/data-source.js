@@ -8,6 +8,7 @@ import { CajaDistribucion } from "../entities/CajaDistribucion.js";
 import { Cliente } from "../entities/Cliente.js";
 import { Equipo } from "../entities/Equipo.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
+import { SystemLog } from "../entities/SystemLog.js";
 
 dotenv.config();
 
@@ -22,7 +23,8 @@ export const AppDataSource = new DataSource({
         CajaDistribucion,
         Cliente,
         Equipo,
-        MovimientoFinanciero
+        MovimientoFinanciero,
+        SystemLog
     ],
     migrations: [],
     subscribers: [],
