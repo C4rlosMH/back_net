@@ -6,12 +6,17 @@ const cajaRepo = AppDataSource.getRepository(CajaDistribucion);
 // Obtener todas
 export const getCajas = async (req, res) => {
     try {
-        const cajas = await cajaRepo.find({ order: { nombre: "ASC" } });
+        const cajas = await cajaRepo.find({ 
+            order: { nombre: "ASC" },
+            relations: ["clientes"] // <--- AGREGAMOS ESTA LÍNEA
+        });
         res.json(cajas);
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
 };
+
+
 
 // Crear nueva
 export const createCaja = async (req, res) => {
@@ -63,3 +68,4 @@ export const deleteCaja = async (req, res) => {
         return res.status(500).json({ message: "No se puede eliminar, posiblemente tiene clientes asignados." });
     }
 };
+
