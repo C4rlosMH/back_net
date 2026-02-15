@@ -38,6 +38,7 @@ export const loginService = async ({ username, password }) => {
     const tokenPayload = {
         id: user.id,
         nombre: user.nombre,
+        username: user.username, // <--- ¡AQUÍ AGREGAMOS EL USERNAME!
         rol: user.rol
     };
 
