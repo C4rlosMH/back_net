@@ -80,3 +80,9 @@ export const getInventarioService = async (filtroEstado) => {
         relations: ["cliente"] // Para ver quién lo tiene si está instalado
     });
 };
+
+export const deleteEquipoService = async (id) => {
+    const result = await equipoRepository.delete({ id: parseInt(id) });
+    if (result.affected === 0) throw new Error("Equipo no encontrado");
+    return true;
+};

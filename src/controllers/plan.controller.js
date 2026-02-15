@@ -1,11 +1,11 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Plan } from "../entities/Plan.js";
+import { registrarLog } from "../services/log.service.js"; // <--- Importación
 
 const planRepo = AppDataSource.getRepository(Plan);
 
 export const getPlanes = async (req, res) => {
     try {
-        // Ordenamos por precio para que se vean bonitos en la lista
         const planes = await planRepo.find({ order: { precio_mensual: "ASC" } });
         res.json(planes);
     } catch (error) {
@@ -25,6 +25,16 @@ export const createPlan = async (req, res) => {
         });
 
         await planRepo.save(plan);
+
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.user?.username || "Administrador",
+            "CREAR_PLAN",
+            `Se creo el plan de internet: ${nombre} (${velocidad_mb} Mbps por $${precio_mensual})`,
+            "Plan",
+            plan.id
+        );
+
         res.json(plan);
     } catch (error) {
         return res.status(500).json({ message: error.message });
@@ -38,9 +48,17 @@ export const togglePlan = async (req, res) => {
 
         if (!plan) return res.status(404).json({ message: "Plan no encontrado" });
 
-        // Invertimos el estado (Si es true pasa a false, y viceversa)
         plan.activo = !plan.activo;
         await planRepo.save(plan);
+
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.user?.username || "Administrador",
+            "ESTADO_PLAN",
+            `Se marco el plan "${plan.nombre}" como ${plan.activo ? 'ACTIVO' : 'INACTIVO'}`,
+            "Plan",
+            plan.id
+        );
 
         res.json(plan);
     } catch (error) {
@@ -55,10 +73,18 @@ export const updatePlan = async (req, res) => {
 
         if (!plan) return res.status(404).json({ message: "Plan no encontrado" });
 
-        // Actualizamos los campos recibidos
         planRepo.merge(plan, req.body);
-        
         await planRepo.save(plan);
+
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.user?.username || "Administrador",
+            "ACTUALIZAR_PLAN",
+            `Se modificaron los detalles del plan: ${plan.nombre}`,
+            "Plan",
+            plan.id
+        );
+
         res.json(plan);
     } catch (error) {
         return res.status(500).json({ message: error.message });

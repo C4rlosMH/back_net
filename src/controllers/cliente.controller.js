@@ -1,14 +1,16 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Cliente } from "../entities/Cliente.js";
-import { Equipo } from "../entities/Equipo.js"; // Importamos Equipo para actualizarlo
-import { In } from "typeorm"; // Para consultas "WHERE id IN (...)"
+import { Equipo } from "../entities/Equipo.js"; 
+import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
+import { In } from "typeorm"; 
+import { registrarLog } from "../services/log.service.js"; // Importamos el servicio de logs
 
 const clienteRepo = AppDataSource.getRepository(Cliente);
 const equipoRepo = AppDataSource.getRepository(Equipo);
+const movimientoRepo = AppDataSource.getRepository(MovimientoFinanciero);
 
 export const getClientes = async (req, res) => {
     try {
-        // Traemos "equipos" (plural)
         const clientes = await clienteRepo.find({ relations: ["plan", "equipos", "caja"] });
         res.json(clientes);
     } catch (error) {
@@ -18,25 +20,31 @@ export const getClientes = async (req, res) => {
 
 export const createCliente = async (req, res) => {
     try {
-        // Recibimos 'equiposIds' (Array de IDs) en lugar de 'equipoId'
         const { planId, equiposIds, cajaId, ...data } = req.body;
 
         const cliente = clienteRepo.create({
             ...data,
             plan: planId ? { id: planId } : null,
             caja: cajaId ? { id: cajaId } : null
-            // No asignamos equipos aquí directamente, lo hacemos tras guardar
         });
 
         const savedCliente = await clienteRepo.save(cliente);
 
-        // Si enviaron equipos, los actualizamos para que pertenezcan a este cliente
         if (equiposIds && equiposIds.length > 0) {
             await equipoRepo.update(
                 { id: In(equiposIds) }, 
                 { cliente: savedCliente, estado: "INSTALADO" }
             );
         }
+
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.usuario?.nombre || "Administrador", // Puedes ajustarlo si tienes los datos del usuario logueado en req
+            "CREAR_CLIENTE",
+            `Se registro el nuevo cliente: ${savedCliente.nombre_completo}`,
+            "Cliente",
+            savedCliente.id
+        );
 
         res.json(savedCliente);
     } catch (error) {
@@ -56,7 +64,9 @@ export const updateCliente = async (req, res) => {
 
         if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
 
-        // 1. Actualizar datos básicos
+        const nombreAnterior = cliente.nombre_completo;
+
+        // 1. Actualizar datos basicos
         clienteRepo.merge(cliente, {
             ...data,
             plan: planId ? { id: planId } : null,
@@ -64,9 +74,8 @@ export const updateCliente = async (req, res) => {
         });
         await clienteRepo.save(cliente);
 
-        // 2. Gestión de Equipos (Si se envía una nueva lista)
+        // 2. Gestion de Equipos (Si se envia una nueva lista)
         if (equiposIds) {
-            // A. Liberar equipos anteriores (ponerlos en ALMACEN y quitar cliente)
             if (cliente.equipos && cliente.equipos.length > 0) {
                 const idsAnteriores = cliente.equipos.map(e => e.id);
                 await equipoRepo.update(
@@ -75,7 +84,6 @@ export const updateCliente = async (req, res) => {
                 );
             }
 
-            // B. Asignar nuevos equipos
             if (equiposIds.length > 0) {
                 await equipoRepo.update(
                     { id: In(equiposIds) },
@@ -84,13 +92,21 @@ export const updateCliente = async (req, res) => {
             }
         }
 
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.usuario?.nombre || "Administrador",
+            "ACTUALIZAR_CLIENTE",
+            `Se actualizo el perfil o estado del cliente: ${nombreAnterior}`,
+            "Cliente",
+            cliente.id
+        );
+
         res.json(cliente);
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
 };
 
-// ... Las demás funciones (getCliente, deleteCliente) se mantienen igual, solo cambia relations: ["equipos"]
 export const getCliente = async (req, res) => {
     try {
         const { id } = req.params;
@@ -108,12 +124,42 @@ export const getCliente = async (req, res) => {
 export const deleteCliente = async (req, res) => {
     try {
         const { id } = req.params;
-        // Al borrar cliente, TypeORM pondrá clienteId = null en los equipos (si está configurado SET NULL)
-        // O podrías querer liberarlos manualmente antes.
-        const result = await clienteRepo.delete({ id: parseInt(id) });
-        if (result.affected === 0) return res.status(404).json({ message: "Cliente no encontrado" });
+        
+        // 1. Buscar al cliente para verificar que equipos tiene asignados
+        const cliente = await clienteRepo.findOne({
+            where: { id: parseInt(id) },
+            relations: ["equipos"]
+        });
+
+        if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
+
+        // 2. Liberar los equipos (ponerlos en ALMACEN y desvincularlos del cliente)
+        if (cliente.equipos && cliente.equipos.length > 0) {
+            const equiposIds = cliente.equipos.map(e => e.id);
+            await equipoRepo.update(
+                { id: In(equiposIds) },
+                { cliente: null, estado: "ALMACEN" }
+            );
+        }
+
+        // 3. Eliminar los movimientos financieros (historial de pagos) de este cliente
+        await movimientoRepo.delete({ cliente: { id: parseInt(id) } });
+
+        // 4. Eliminar el cliente
+        await clienteRepo.delete({ id: parseInt(id) });
+        
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.usuario?.nombre || "Administrador",
+            "ELIMINAR_CLIENTE",
+            `Se elimino definitivamente al cliente: ${cliente.nombre_completo}`,
+            "Cliente",
+            parseInt(id)
+        );
+
         return res.sendStatus(204);
     } catch (error) {
+        console.error("Error al eliminar cliente:", error);
         return res.status(500).json({ message: error.message });
     }
 };
