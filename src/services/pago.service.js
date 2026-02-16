@@ -32,16 +32,23 @@ export const registrarPagoService = async (data) => {
     if (!cliente) throw new Error("Cliente no encontrado");
 
     const montoPago = Number(data.monto);
-    let desc = data.referencia || "Abono general";
     
-    if (data.tipo_pago === 'LIQUIDACION') desc = `Liquidación - ${data.mes_servicio || 'Saldo'}`;
-    else if (data.tipo_pago === 'APLAZADO') desc = `Promesa Pago - ${data.mes_servicio}`;
-    else if (data.mes_servicio) desc = `Abono Mes: ${data.mes_servicio}`;
+    // 1. Generamos la descripción base según el tipo de pago
+    let descBase = "Abono general";
+    if (data.tipo_pago === 'LIQUIDACION') descBase = `Liquidación - ${data.mes_servicio || 'Saldo'}`;
+    else if (data.tipo_pago === 'APLAZADO') descBase = `Promesa Pago - ${data.mes_servicio}`;
+    else if (data.mes_servicio) descBase = `Abono Mes: ${data.mes_servicio}`;
 
+    // 2. Si recibimos una nota personalizada desde el frontend, se la concatenamos
+    if (data.descripcion && data.descripcion.trim() !== "") {
+        descBase = `${descBase} | Nota: ${data.descripcion.trim()}`;
+    }
+
+    // 3. Creamos el movimiento con la descripción combinada
     const pago = movimientoRepository.create({
         tipo: "ABONO",
         monto: montoPago,
-        descripcion: desc,
+        descripcion: descBase, // Usamos la variable combinada
         mes_servicio: data.mes_servicio || null,
         metodo_pago: data.metodo_pago || "EFECTIVO",
         cliente: cliente
@@ -55,7 +62,6 @@ export const registrarPagoService = async (data) => {
     await AppDataSource.transaction(async manager => {
         await manager.save(pago);
         await manager.save(cliente);
-        // Aquí podrías insertar en SystemLog si quisieras
     });
 
     return { mensaje: "Pago registrado", saldo_restante: cliente.saldo_actual };
