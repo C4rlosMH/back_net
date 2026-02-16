@@ -18,9 +18,17 @@ export const Cliente = new EntitySchema({
             enum: ["ACTIVO", "SUSPENDIDO", "CORTADO", "BAJA"], 
             default: "ACTIVO" 
         },
+        
+        ip_asignada: {
+            type: "varchar",
+            length: 50,
+            nullable: true
+        },
+
         dia_corte: { type: "int", default: 1 }, 
         saldo_actual: { type: "decimal", precision: 10, scale: 2, default: 0.00 }, 
         fecha_instalacion: { type: "date", nullable: true }, // <--- Agregado (útil para el front)
+
 
         createdAt: { createDate: true },
     },

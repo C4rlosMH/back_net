@@ -20,6 +20,7 @@
   "homepage": "https://github.com/C4rlosMH/backend_miranda_net#readme",
   "description": "",
   "dependencies": {
+    "@faker-js/faker": "^10.3.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
