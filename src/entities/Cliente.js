@@ -42,6 +42,9 @@ export const Cliente = new EntitySchema({
         },
         saldo_aplazado: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
         
+        // ---> NUEVO CAMPO AÑADIDO <---
+        deuda_historica: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
+        
         // --- BOLSA DE SALDO A FAVOR ---
         saldo_a_favor: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
 

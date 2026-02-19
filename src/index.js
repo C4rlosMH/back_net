@@ -7,8 +7,10 @@ import {createAdminUser} from "./utils/initialSetup.js";
 import {seedDatabase} from "./utils/seedDatabase.js";
 
 
-import { iniciarWhatsApp } from "./services/whatsapp.service.js"; // <--- DESCOMENTAR IMPORT
-import { iniciarCronJobs } from "./services/cron.service.js";
+import { iniciarCronFacturacion } from "./crons/facturacion.cron.js";
+import { iniciarCronPenalizacion } from "./crons/penalizacion.cron.js";
+import { iniciarCronWhatsApp } from "./crons/whatsapp.cron.js";
+import { iniciarCronSuspension } from "./crons/suspencion.cron.js";
 
 //importar rutas
 import clienteRoutes from "./routes/cliente.routes.js";
@@ -55,8 +57,11 @@ async function main() {
         console.log("Base de Datos conectada con TypeORM");
 
         await createAdminUser();
-        iniciarWhatsApp();
-        iniciarCronJobs();
+
+        iniciarCronFacturacion();
+        iniciarCronPenalizacion();
+        iniciarCronWhatsApp();
+        iniciarCronSuspension()
 
         //await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA
         // 2. Iniciar Servidor Express

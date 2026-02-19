@@ -46,6 +46,11 @@ async function importarDatosYEquipos() {
         const idxLat = encabezados.indexOf("latitud");
         const idxLon = encabezados.indexOf("longitud");
         const idxPlan = encabezados.indexOf("plan");
+        
+        // Nuevas columnas financieras
+        const idxDeudaHistorica = encabezados.findIndex(h => h === "deuda_historica" || h === "deuda_historcia");
+        const idxDeudaCorriente = encabezados.indexOf("deuda_corriente");
+        const idxSaldoFavor = encabezados.indexOf("saldo_favor");
 
         if (idxNombre === -1) {
             console.error("Error: No se encontro la columna 'Nombre' en los encabezados.");
@@ -77,6 +82,11 @@ async function importarDatosYEquipos() {
             const longitud = idxLon !== -1 && columnas[idxLon] ? parseFloat(columnas[idxLon]) : null;
             const planNombre = idxPlan !== -1 ? columnas[idxPlan]?.trim() : null;
 
+            // Procesar valores financieros
+            const deudaHistorica = idxDeudaHistorica !== -1 && columnas[idxDeudaHistorica] ? parseFloat(columnas[idxDeudaHistorica]) : 0;
+            const deudaCorriente = idxDeudaCorriente !== -1 && columnas[idxDeudaCorriente] ? parseFloat(columnas[idxDeudaCorriente]) : 0;
+            const saldoFavor = idxSaldoFavor !== -1 && columnas[idxSaldoFavor] ? parseFloat(columnas[idxSaldoFavor]) : 0;
+
             let planAsignado = null;
             if (planNombre) planAsignado = await planRepo.findOneBy({ nombre: planNombre });
 
@@ -85,7 +95,6 @@ async function importarDatosYEquipos() {
                 cajaAsignada = await cajaRepo.findOneBy({ nombre: nombreCaja });
             }
 
-            // Generar una fecha de instalacion aleatoria en el ultimo ano
             const fechaInstalacion = faker.date.past({ years: 1 });
 
             const nuevoCliente = clienteRepo.create({
@@ -99,8 +108,12 @@ async function importarDatosYEquipos() {
                 longitud: longitud,
                 plan: planAsignado,
                 caja: cajaAsignada,
-                saldo_actual: 0,
-                fecha_instalacion: fechaInstalacion // Se agrega al modelo
+                fecha_instalacion: fechaInstalacion,
+                // Lógica de saldos separada
+                saldo_actual: isNaN(deudaCorriente) ? 0 : deudaCorriente,
+                deuda_historica: isNaN(deudaHistorica) ? 0 : deudaHistorica,
+                saldo_a_favor: isNaN(saldoFavor) ? 0 : saldoFavor,
+                saldo_aplazado: 0 
             });
 
             await clienteRepo.save(nuevoCliente);
@@ -157,7 +170,7 @@ async function importarDatosYEquipos() {
             equiposCreados += equiposGenerados.length;
         }
 
-        console.log(`\nImportacion exitosa. Fechas de instalacion asignadas correctamente.`);
+        console.log(`\nImportacion exitosa. Fechas de instalacion y saldos asignados correctamente.`);
         console.log(`- Clientes agregados: ${importados}`);
         console.log(`- Equipos generados: ${equiposCreados}`);
         process.exit(0);

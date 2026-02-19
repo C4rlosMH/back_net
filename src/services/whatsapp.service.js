@@ -14,7 +14,7 @@ const createClient = () => {
     });
 
     client.on('qr', (qr) => {
-        console.log('Nuevo QR generado. Ve al Panel de Control > Conexión WhatsApp para escanearlo.');
+        //console.log('Nuevo QR generado. Ve al Panel de Control > Conexión WhatsApp para escanearlo.');
         qrCodeData = qr;
         connectionStatus = 'QR_READY';
     });
@@ -69,7 +69,7 @@ export const logoutWhatsApp = async () => {
 
 export const enviarMensajeWhatsApp = async (numero, mensaje) => {
     if (connectionStatus !== 'READY' || !client) {
-        console.log("No se pudo enviar: WhatsApp no está conectado.");
+        //console.log("No se pudo enviar: WhatsApp no está conectado.");
         return false;
     }
     
