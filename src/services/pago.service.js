@@ -21,8 +21,9 @@ export const generarCargoMensualService = async (clienteId) => {
     cliente.saldo_actual = Number(cliente.saldo_actual) + costo;
 
     await AppDataSource.transaction(async manager => {
-        await manager.save(mov);
-        await manager.save(cliente);
+        // CORRECCIÓN AQUÍ: Se especifica el repositorio dentro de la transacción
+        await manager.getRepository(MovimientoFinanciero).save(mov);
+        await manager.getRepository(Cliente).save(cliente);
     });
     return { mensaje: "Cargo generado", nuevo_saldo: cliente.saldo_actual };
 };
@@ -38,54 +39,45 @@ export const registrarPagoService = async (data) => {
     // --- 1. LÓGICA FIFO (Cobrar deuda vieja primero) ---
     if (Number(cliente.saldo_aplazado) > 0) {
         if (montoPago >= Number(cliente.saldo_aplazado)) {
-            // El pago cubre toda la deuda atrasada (y puede que sobre para la actual)
             abonoAtrasado = Number(cliente.saldo_aplazado);
             abonoCorriente = montoPago - abonoAtrasado;
             cliente.saldo_aplazado = 0;
         } else {
-            // El pago solo cubre una parte de la deuda atrasada
             abonoAtrasado = montoPago;
             cliente.saldo_aplazado = Number(cliente.saldo_aplazado) - montoPago;
         }
     } else {
-        // No hay deuda atrasada, todo va al mes corriente
         abonoCorriente = montoPago;
     }
 
     // Descontamos el restante (si lo hay) del saldo actual
     if (abonoCorriente > 0) {
         cliente.saldo_actual = Number(cliente.saldo_actual) - abonoCorriente;
-        // Reactivación automática si estaba cortado y ya no debe el mes corriente
         if (cliente.saldo_actual <= 0 && cliente.estado === "CORTADO") {
             cliente.estado = "ACTIVO"; 
         }
     }
 
     // --- 2. LÓGICA DE CONFIABILIDAD ---
-    // Evaluamos si hubo retraso, siempre y cuando no se indique que fue por tu logística o acuerdo
     if (data.motivo_retraso !== 'logistica' && data.motivo_retraso !== 'acuerdo') {
         const hoy = new Date();
         const diaActual = hoy.getDate();
         const diaPago = cliente.dia_pago;
 
-        // Cálculo para saber cuántos días han pasado desde su día de pago
         let diasRetraso = diaActual - diaPago;
-        // Ajuste por si el corte es a fin de mes (ej. día 30) y hoy es inicio de mes (ej. día 2)
         if (diasRetraso < 0 && diaActual <= 7) { 
             const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
             diasRetraso = diaActual + (ultimoDiaMesAnterior - diaPago);
         }
 
-        // Aplicamos reglas de puntos
+        // Manejo seguro por si confiabilidad es null (usamos 100 por defecto)
+        const confiabilidadActual = cliente.confiabilidad ?? 100;
+
         if (diasRetraso >= 0 && diasRetraso <= 5) {
-            // Premio: Pagó a tiempo o en gracia. Sube 2% (Máx 100%)
-            cliente.confiabilidad = Math.min(100, cliente.confiabilidad + 2);
+            cliente.confiabilidad = Math.min(100, confiabilidadActual + 2);
         } else if (diasRetraso === 6 || diasRetraso === 7) {
-            // Penalización leve: Pagó tarde pero antes del aplazamiento grave. Baja 5%
-            cliente.confiabilidad = Math.max(0, cliente.confiabilidad - 5);
+            cliente.confiabilidad = Math.max(0, confiabilidadActual - 5);
         }
-        // Nota: Si los días de retraso son más de 7, la falta grave (-15%) la aplicará 
-        // automáticamente el Cron Job (automatización), así que aquí no restamos nada extra.
     }
 
     // --- 3. GENERACIÓN DEL HISTORIAL (Movimiento) ---
@@ -94,7 +86,6 @@ export const registrarPagoService = async (data) => {
     else if (data.tipo_pago === 'APLAZADO') descBase = `Pago Mes Aplazado`;
     else if (data.mes_servicio) descBase = `Abono Mes: ${data.mes_servicio}`;
 
-    // Si pagó algo de deuda atrasada, lo indicamos en el historial
     if (abonoAtrasado > 0) {
         descBase = `Recuperación de Adeudo ($${abonoAtrasado}) | ${descBase}`;
     }
@@ -109,12 +100,14 @@ export const registrarPagoService = async (data) => {
         descripcion: descBase, 
         mes_servicio: data.mes_servicio || null,
         metodo_pago: data.metodo_pago || "EFECTIVO",
+        referencia: data.referencia || null, // Guardado de la referencia (Folio)
         cliente: cliente
     });
 
     await AppDataSource.transaction(async manager => {
-        await manager.save(pago);
-        await manager.save(cliente);
+        // CORRECCIÓN AQUÍ: Se especifica el repositorio para evitar el error de EntitySchema
+        await manager.getRepository(MovimientoFinanciero).save(pago);
+        await manager.getRepository(Cliente).save(cliente);
     });
 
     return { 

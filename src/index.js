@@ -6,8 +6,9 @@ import { AppDataSource } from "./config/data-source.js";
 import {createAdminUser} from "./utils/initialSetup.js";
 import {seedDatabase} from "./utils/seedDatabase.js";
 
+
+import { iniciarWhatsApp } from "./services/whatsapp.service.js"; // <--- DESCOMENTAR IMPORT
 import { iniciarCronJobs } from "./services/cron.service.js";
-//import { iniciarWhatsApp } from "/services/whatsapp.service.js";
 
 //importar rutas
 import clienteRoutes from "./routes/cliente.routes.js";
@@ -19,6 +20,7 @@ import userRoutes from "./routes/user.routes.js";
 import planRoutes from "./routes/plan.routes.js";
 import cajaRoutes from "./routes/caja.routes.js";
 import logRoutes from "./routes/log.routes.js";
+import whatsappRoutes from "./routes/whatsapp.routes.js"; // <--- IMPORTAR
 
 dotenv.config();
 const app = express();
@@ -30,6 +32,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
 // Usar rutas
 app.use("/api/clientes", clienteRoutes);
 app.use("/api/equipos", equipoRoutes);
@@ -40,6 +44,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/planes", planRoutes);
 app.use("/api/cajas", cajaRoutes);
 app.use("/api/logs", logRoutes);
+app.use("/api/whatsapp", whatsappRoutes); // <--- USAR RUTAS DE WHATSAPP
 
 const PORT = process.env.PORT;
 
@@ -50,7 +55,7 @@ async function main() {
         console.log("Base de Datos conectada con TypeORM");
 
         await createAdminUser();
-        //iniciarWhatsApp();
+        iniciarWhatsApp();
         iniciarCronJobs();
 
         //await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA

@@ -18,7 +18,12 @@ export const MovimientoFinanciero = new EntitySchema({
         
         metodo_pago: { 
             type: "enum", 
-            enum: ["EFECTIVO", "TRANSFERENCIA", "DEPOSITO", "SISTEMA"], 
+            enum: ["EFECTIVO", "TRANSFERENCIA", "DEPOSITO"], 
+            nullable: true 
+        },
+
+        referencia: { 
+            type: "varchar", 
             nullable: true 
         },
         

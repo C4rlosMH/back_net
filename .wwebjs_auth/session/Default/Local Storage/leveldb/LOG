@@ -1,0 +1,6 @@
+2026/02/18-21:12:15.446 8178 Reusing MANIFEST Q:\Miranda Net\Backend\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/02/18-21:12:15.450 8178 Recovering log #3
+2026/02/18-21:12:15.451 8178 Reusing old log Q:\Miranda Net\Backend\.wwebjs_auth\session\Default\Local Storage\leveldb/000003.log 
+2026/02/18-21:13:15.466 3770 Level-0 table #5: started
+2026/02/18-21:13:15.541 3770 Level-0 table #5: 25644 bytes OK
+2026/02/18-21:13:15.544 3770 Delete type=0 #3
