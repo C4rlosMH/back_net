@@ -7,7 +7,6 @@ export const createEquipo = async (req, res) => {
     try {
         const equipo = await crearEquipoService(req.body);
         
-        // --- REGISTRO DE LOG ---
         registrarLog(
             req.user?.username || "Administrador",
             "CREAR_EQUIPO",
@@ -32,7 +31,6 @@ export const asignarEquipos = async (req, res) => {
 
         const result = await asignarEquiposService(clienteId, equiposIds);
 
-        // --- REGISTRO DE LOG ---
         registrarLog(
             req.user?.username || "Administrador",
             "ASIGNAR_EQUIPO",
@@ -47,7 +45,6 @@ export const asignarEquipos = async (req, res) => {
     }
 };
 
-// --- PAGINACIÓN IMPLEMENTADA ---
 export const getInventario = async (req, res) => {
     try {
         const equipoRepo = AppDataSource.getRepository(Equipo);
@@ -57,13 +54,12 @@ export const getInventario = async (req, res) => {
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
 
-        // Construir la condición si enviaron un estado específico
         const whereCondition = estado && estado !== "TODOS" ? { estado } : {};
 
         const [equipos, total] = await equipoRepo.findAndCount({
             where: whereCondition,
             relations: ["cliente"],
-            order: { createdAt: "DESC" },
+            order: { id: "DESC" }, // CORRECCIÓN: Ordenar por 'id' ya que no existe 'createdAt'
             take: limitNum,
             skip: skip
         });
@@ -75,6 +71,7 @@ export const getInventario = async (req, res) => {
             currentPage: pageNum
         });
     } catch (error) {
+        console.error("Error en getInventario:", error);
         res.status(500).json({ message: "Error al obtener inventario" });
     }
 };
@@ -84,7 +81,6 @@ export const deleteEquipo = async (req, res) => {
         const { id } = req.params;
         await deleteEquipoService(id);
         
-        // --- REGISTRO DE LOG ---
         registrarLog(
             req.user?.username || "Administrador",
             "ELIMINAR_EQUIPO",
