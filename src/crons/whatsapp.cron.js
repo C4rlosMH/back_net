@@ -60,5 +60,9 @@ export const iniciarCronWhatsApp = () => {
         } catch (error) {
             console.error("Error enviando notificaciones Cron:", error);
         }
+    },
+    {
+        scheduled: true,
+        timezone: "America/Mexico_City"
     });
 };

@@ -50,5 +50,9 @@ export const iniciarCronPenalizacion = () => {
         } catch (error) {
             console.error("Error en la automatización de aplazamientos:", error);
         }
+    },
+    {
+        scheduled: true,
+        timezone: "America/Mexico_City"
     });
 };

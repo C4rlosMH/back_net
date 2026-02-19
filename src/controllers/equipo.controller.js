@@ -1,5 +1,7 @@
-import { crearEquipoService, asignarEquiposService, getInventarioService, deleteEquipoService } from "../services/equipo.service.js";
-import { registrarLog } from "../services/log.service.js"; // <--- Importación
+import { AppDataSource } from "../config/data-source.js";
+import { Equipo } from "../entities/Equipo.js";
+import { crearEquipoService, asignarEquiposService, deleteEquipoService } from "../services/equipo.service.js";
+import { registrarLog } from "../services/log.service.js";
 
 export const createEquipo = async (req, res) => {
     try {
@@ -45,17 +47,38 @@ export const asignarEquipos = async (req, res) => {
     }
 };
 
+// --- PAGINACIÓN IMPLEMENTADA ---
 export const getInventario = async (req, res) => {
     try {
-        const { estado } = req.query; 
-        const equipos = await getInventarioService(estado);
-        res.json(equipos);
+        const equipoRepo = AppDataSource.getRepository(Equipo);
+        const { estado, page = 1, limit = 12 } = req.query; 
+        
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Construir la condición si enviaron un estado específico
+        const whereCondition = estado && estado !== "TODOS" ? { estado } : {};
+
+        const [equipos, total] = await equipoRepo.findAndCount({
+            where: whereCondition,
+            relations: ["cliente"],
+            order: { createdAt: "DESC" },
+            take: limitNum,
+            skip: skip
+        });
+
+        res.json({
+            equipos,
+            total,
+            totalPages: Math.ceil(total / limitNum),
+            currentPage: pageNum
+        });
     } catch (error) {
         res.status(500).json({ message: "Error al obtener inventario" });
     }
 };
 
-// Función de eliminar que habíamos creado (con su log)
 export const deleteEquipo = async (req, res) => {
     try {
         const { id } = req.params;

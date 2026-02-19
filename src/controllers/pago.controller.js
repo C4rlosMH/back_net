@@ -1,10 +1,11 @@
+import { AppDataSource } from "../config/data-source.js";
+import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { 
     generarCargoMensualService, 
     registrarPagoService, 
-    getHistorialPagosService,
-    getMovimientosGlobalesService 
+    getHistorialPagosService
 } from "../services/pago.service.js";
-import { registrarLog } from "../services/log.service.js"; // <--- Importación
+import { registrarLog } from "../services/log.service.js";
 
 export const generarCargo = async (req, res) => {
     try {
@@ -55,11 +56,29 @@ export const getHistorial = async (req, res) => {
     }
 };
 
+// --- PAGINACIÓN IMPLEMENTADA ---
 export const getPagosGlobales = async (req, res) => {
     try {
-        const historial = await getMovimientosGlobalesService();
-        res.json(historial);
+        const movimientoRepo = AppDataSource.getRepository(MovimientoFinanciero);
+        
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 15;
+        const skip = (page - 1) * limit;
+
+        const [movimientos, total] = await movimientoRepo.findAndCount({
+            relations: ["cliente"],
+            order: { fecha: "DESC" },
+            take: limit,
+            skip: skip
+        });
+
+        res.json({
+            movimientos,
+            total,
+            totalPages: Math.ceil(total / limit),
+            currentPage: page
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: "Error al obtener el historial de pagos" });
     }
 };

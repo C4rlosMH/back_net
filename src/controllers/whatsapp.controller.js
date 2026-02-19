@@ -1,5 +1,6 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Cliente } from "../entities/Cliente.js";
+import { registrarLog } from "../services/log.service.js"; // <--- Importación
 import { 
     enviarNotificacion, 
     getWhatsAppStatus, 
@@ -9,7 +10,6 @@ import {
 
 export const enviarMensajeManual = async (req, res) => {
     try {
-        // CORRECCIÓN: Extraer la variable 'mensaje' que envía el frontend
         const { clienteId, tipo, mensaje } = req.body; 
         
         const clienteRepository = AppDataSource.getRepository(Cliente);
@@ -20,10 +20,18 @@ export const enviarMensajeManual = async (req, res) => {
 
         if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
 
-        // CORRECCIÓN: Pasar el 'mensaje' a la función
         const enviado = await enviarNotificacion(cliente, tipo, mensaje);
 
         if (enviado) {
+            // --- REGISTRO EN LOGS (Solo front) ---
+            registrarLog(
+                req.user?.username || "Usuario del Sistema",
+                "WHATSAPP_MANUAL",
+                `Mensaje enviado a ${cliente.nombre_completo}: "${mensaje.substring(0, 50)}..."`,
+                "Cliente",
+                cliente.id
+            );
+
             return res.json({ message: "Mensaje enviado con éxito" });
         } else {
             return res.status(500).json({ message: "El bot no está listo o el número de teléfono es inválido." });

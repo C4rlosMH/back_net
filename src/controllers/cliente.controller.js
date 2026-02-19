@@ -11,10 +11,49 @@ const movimientoRepo = AppDataSource.getRepository(MovimientoFinanciero);
 
 export const getClientes = async (req, res) => {
     try {
-        const clientes = await clienteRepo.find({ relations: ["plan", "equipos", "caja"] });
-        res.json(clientes);
+        const clienteRepo = AppDataSource.getRepository(Cliente);
+        
+        // Obtenemos los parámetros de la URL (por defecto página 1, límite 10)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const search = req.query.search || "";
+        const tab = req.query.tab || "TODOS";
+
+        // Construcción de la consulta con filtros básicos
+        const queryBuilder = clienteRepo.createQueryBuilder("cliente")
+            .leftJoinAndSelect("cliente.plan", "plan")
+            .leftJoinAndSelect("cliente.caja", "caja")
+            .leftJoinAndSelect("cliente.equipos", "equipos");
+
+        // Filtro por Tab (Estado)
+        if (tab !== "TODOS") {
+            queryBuilder.andWhere("cliente.estado = :tab", { tab });
+        }
+
+        // Filtro por búsqueda (Nombre o IP)
+        if (search) {
+            queryBuilder.andWhere(
+                "(cliente.nombre_completo LIKE :search OR cliente.ip_asignada LIKE :search)",
+                { search: `%${search}%` }
+            );
+        }
+
+        // Ejecutamos la consulta con paginación
+        const [clientes, total] = await queryBuilder
+            .skip(skip)
+            .take(limit)
+            .orderBy("cliente.nombre_completo", "ASC")
+            .getManyAndCount();
+
+        res.json({
+            clientes,
+            total,
+            totalPages: Math.ceil(total / limit),
+            currentPage: page
+        });
     } catch (error) {
-        return res.status(500).json({ message: error.message });
+        res.status(500).json({ message: "Error al obtener clientes" });
     }
 };
 
