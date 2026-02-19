@@ -9,13 +9,14 @@ import { Cliente } from "../entities/Cliente.js";
 import { Equipo } from "../entities/Equipo.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { SystemLog } from "../entities/SystemLog.js";
+import { CierreQuincenal } from "../entities/CierreQuincenal.js"; // <--- NUEVA IMPORTACION
 
 dotenv.config();
 
 export const AppDataSource = new DataSource({
     type: "mysql",
     url: process.env.DATABASE_URL,
-    synchronize: true, // Mantiene la estructura actualizada, pero NO borra datos
+    synchronize: true, 
     logging: false,
     entities: [
         UserSistema,
@@ -24,7 +25,8 @@ export const AppDataSource = new DataSource({
         Cliente,
         Equipo,
         MovimientoFinanciero,
-        SystemLog
+        SystemLog,
+        CierreQuincenal // <--- AGREGADO AQUI
     ],
     migrations: [],
     subscribers: [],

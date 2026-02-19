@@ -6,6 +6,9 @@ import { AppDataSource } from "./config/data-source.js";
 import {createAdminUser} from "./utils/initialSetup.js";
 import {seedDatabase} from "./utils/seedDatabase.js";
 
+import { iniciarCronJobs } from "./services/cron.service.js";
+//import { iniciarWhatsApp } from "/services/whatsapp.service.js";
+
 //importar rutas
 import clienteRoutes from "./routes/cliente.routes.js";
 import equipoRoutes from "./routes/equipo.routes.js";
@@ -47,6 +50,8 @@ async function main() {
         console.log("Base de Datos conectada con TypeORM");
 
         await createAdminUser();
+        //iniciarWhatsApp();
+        iniciarCronJobs();
 
         //await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA
         // 2. Iniciar Servidor Express

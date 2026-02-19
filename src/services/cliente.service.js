@@ -33,7 +33,7 @@ export const createClienteService = async (data) => {
 export const getClientesService = async () => {
     // Traemos los clientes junto con su plan y la caja a la que están conectados
     return await clienteRepository.find({
-        relations: ["plan", "cajaConectada"], 
+        relations: ["plan", "caja"], 
         order: { id: "DESC" }
     });
 };

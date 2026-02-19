@@ -6,12 +6,12 @@ export const Cliente = new EntitySchema({
     columns: {
         id: { primary: true, type: "int", generated: true },
         nombre_completo: { type: "varchar" },
-        telefono: { type: "varchar", nullable: true }, // <--- Agregué nullable por si acaso
+        telefono: { type: "varchar", nullable: true }, 
         direccion: { type: "text", nullable: true },
         dia_pago: { type: "int", default: 15 },
         
-        latitud: { type: "float", nullable: true }, // <--- Simplificado
-        longitud: { type: "float", nullable: true }, // <--- Simplificado
+        latitud: { type: "float", nullable: true }, 
+        longitud: { type: "float", nullable: true }, 
 
         estado: { 
             type: "enum", 
@@ -27,8 +27,20 @@ export const Cliente = new EntitySchema({
 
         dia_corte: { type: "int", default: 1 }, 
         saldo_actual: { type: "decimal", precision: 10, scale: 2, default: 0.00 }, 
-        fecha_instalacion: { type: "date", nullable: true }, // <--- Agregado (útil para el front)
+        fecha_instalacion: { type: "date", nullable: true },
 
+        // --- NUEVOS CAMPOS ---
+        confiabilidad: {
+            type: "int",
+            nullable: true,
+            default: null
+        },
+        tipo_conexion: { 
+            type: "enum", 
+            enum: ["fibra", "radio"], 
+            default: "fibra" 
+        },
+        saldo_aplazado: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
 
         createdAt: { createDate: true },
     },
@@ -36,10 +48,9 @@ export const Cliente = new EntitySchema({
         plan: {
             type: "many-to-one",
             target: "Plan",
-            joinColumn: { name: "planId" }, // <--- Especificar nombre ayuda a evitar errores
+            joinColumn: { name: "planId" }, 
             nullable: true
         },
-        // --- CAMBIO IMPORTANTE: DE "cajaConectada" A "caja" ---
         caja: { 
             type: "many-to-one",
             target: "CajaDistribucion",
@@ -49,7 +60,7 @@ export const Cliente = new EntitySchema({
         equipos: {
             type: "one-to-many",
             target: "Equipo",
-            inverseSide: "cliente", // Asegúrate que en Equipo.js la relación se llame "cliente"
+            inverseSide: "cliente",
             cascade: true
         },
         movimientos: {
