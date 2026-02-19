@@ -7,18 +7,18 @@ export const MovimientoFinanciero = new EntitySchema({
         id: { primary: true, type: "int", generated: true },
         mes_servicio: { type: "varchar", nullable: true }, // Ej: "Enero 2024"
         
+        // CORRECCIÓN: Borramos la línea de 'enum' por completo
         tipo: { 
-            type: "enum", 
-            enum: ["CARGO_MENSUAL", "ABONO", "AJUSTE_FAVOR", "AJUSTE_CONTRA"], 
+            type: "varchar"
         },
         
         monto: { type: "decimal", precision: 10, scale: 2 },
         fecha: { createDate: true },
         descripcion: { type: "varchar" },
         
+        // CORRECCIÓN: Borramos la línea de 'enum' por completo
         metodo_pago: { 
-            type: "enum", 
-            enum: ["EFECTIVO", "TRANSFERENCIA", "DEPOSITO"], 
+            type: "varchar", 
             nullable: true 
         },
 

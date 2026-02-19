@@ -1,6 +1,5 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Cliente } from "../entities/Cliente.js";
-// IMPORTANTE: Aquí importamos la función que estaba fallando
 import { 
     enviarNotificacion, 
     getWhatsAppStatus, 
@@ -10,7 +9,8 @@ import {
 
 export const enviarMensajeManual = async (req, res) => {
     try {
-        const { clienteId, tipo } = req.body;
+        // CORRECCIÓN: Extraer la variable 'mensaje' que envía el frontend
+        const { clienteId, tipo, mensaje } = req.body; 
         
         const clienteRepository = AppDataSource.getRepository(Cliente);
         const cliente = await clienteRepository.findOne({ 
@@ -20,25 +20,23 @@ export const enviarMensajeManual = async (req, res) => {
 
         if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
 
-        const enviado = await enviarNotificacion(cliente, tipo);
+        // CORRECCIÓN: Pasar el 'mensaje' a la función
+        const enviado = await enviarNotificacion(cliente, tipo, mensaje);
 
         if (enviado) {
             return res.json({ message: "Mensaje enviado con éxito" });
         } else {
-            return res.status(500).json({ message: "El bot de WhatsApp no está listo o falló el envío." });
+            return res.status(500).json({ message: "El bot no está listo o el número de teléfono es inválido." });
         }
 
     } catch (error) {
-        console.error(error);
+        console.error("Error en enviarMensajeManual:", error);
         return res.status(500).json({ message: "Error interno del servidor" });
     }
 };
 
-// --- MÉTODOS PARA GESTIÓN DE LA CONEXIÓN (QR) ---
-
 export const getStatus = (req, res) => {
     try {
-        // Esta es la línea que daba error. Ahora funcionará gracias al import de arriba.
         const status = getWhatsAppStatus(); 
         res.json(status);
     } catch (error) {

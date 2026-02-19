@@ -41,6 +41,9 @@ export const Cliente = new EntitySchema({
             default: "fibra" 
         },
         saldo_aplazado: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
+        
+        // --- BOLSA DE SALDO A FAVOR ---
+        saldo_a_favor: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
 
         createdAt: { createDate: true },
     },

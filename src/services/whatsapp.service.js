@@ -1,6 +1,5 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
-import qrcode from 'qrcode-terminal';
 
 let qrCodeData = null;
 let connectionStatus = 'DISCONNECTED'; // INITIALIZING, QR_READY, READY, DISCONNECTED
@@ -15,14 +14,13 @@ const createClient = () => {
     });
 
     client.on('qr', (qr) => {
-        //console.log('Nuevo QR generado. Escanéalo en la App.');
+        console.log('Nuevo QR generado. Ve al Panel de Control > Conexión WhatsApp para escanearlo.');
         qrCodeData = qr;
         connectionStatus = 'QR_READY';
-        //qrcode.generate(qr, { small: true });
     });
 
     client.on('ready', () => {
-        //console.log('WhatsApp Bot conectado exitosamente.');
+        console.log('WhatsApp Bot conectado exitosamente.');
         connectionStatus = 'READY';
         qrCodeData = null;
     });
@@ -33,18 +31,16 @@ const createClient = () => {
     });
 
     client.on('disconnected', async (reason) => {
-        //console.log('WhatsApp fue desconectado:', reason);
+        console.log('WhatsApp fue desconectado:', reason);
         connectionStatus = 'DISCONNECTED';
         qrCodeData = null;
-        await client.destroy();
+        if (client) await client.destroy();
         client = null;
         iniciarWhatsApp();
     });
 
     return client;
 };
-
-// --- FUNCIONES EXPORTADAS ---
 
 export const iniciarWhatsApp = () => {
     if (!client) {
@@ -54,7 +50,6 @@ export const iniciarWhatsApp = () => {
     }
 };
 
-// ESTA ES LA FUNCIÓN QUE TE FALTABA O DABA ERROR
 export const getWhatsAppStatus = () => {
     return {
         status: connectionStatus,
@@ -73,32 +68,59 @@ export const logoutWhatsApp = async () => {
 };
 
 export const enviarMensajeWhatsApp = async (numero, mensaje) => {
-    if (connectionStatus !== 'READY' || !client) return false;
+    if (connectionStatus !== 'READY' || !client) {
+        console.log("No se pudo enviar: WhatsApp no está conectado.");
+        return false;
+    }
+    
     try {
-        const numeroLimpio = numero.replace(/\D/g, '');
-        const chatId = `52${numeroLimpio}@c.us`;
-        await client.sendMessage(chatId, mensaje);
+        let numeroLimpio = String(numero).replace(/\D/g, '');
+        
+        if (!numeroLimpio.startsWith('52')) {
+             numeroLimpio = '52' + numeroLimpio;
+        }
+        
+        const registeredNumber = await client.getNumberId(numeroLimpio);
+        
+        if (!registeredNumber) {
+            console.error(`El número ${numeroLimpio} no está registrado en WhatsApp.`);
+            return false;
+        }
+
+        await client.sendMessage(registeredNumber._serialized, mensaje);
         return true;
     } catch (error) {
-        console.error(`Error al enviar WhatsApp a ${numero}:`, error);
+        console.error(`Error interno al enviar WhatsApp a ${numero}:`, error);
         return false;
     }
 };
 
+// --- TEMPLATES ACTUALIZADOS ---
 const getMensajeTemplate = (tipo, cliente) => {
     const nombre = cliente.nombre_completo.split(" ")[0];
-    const plan = cliente.plan ? cliente.plan.nombre : "Servicio Internet";
+    const montoMes = cliente.plan ? Number(cliente.plan.precio_mensual).toFixed(2) : "0.00";
+    const deudaTotal = (Number(cliente.saldo_actual || 0) + Number(cliente.saldo_aplazado || 0)).toFixed(2);
+    
     switch (tipo) {
-        case 'ANTICIPADO': return `👋 Hola ${nombre}, recordatorio: Tu fecha de pago del servicio *${plan}* está próxima.`;
-        case 'RECORDATORIO': return `📅 Hola ${nombre}, hoy es tu día de pago del servicio *${plan}*.`;
-        case 'SUSPENSION': return `⚠️ Hola ${nombre}, tu pago del servicio *${plan}* está vencido.`;
-        case 'AGRADECIMIENTO': return `🎉 Gracias ${nombre}, pago recibido para el servicio *${plan}*.`;
-        default: return `Hola ${nombre}.`;
+        case 'ANTICIPADO': 
+            return `Hola ${nombre}, recordatorio: Tu fecha de pago por la cantidad de *$${montoMes}* está próxima.`;
+        case 'RECORDATORIO': 
+            return `Hola ${nombre}, hoy es tu día de pago por la cantidad de *$${montoMes}*. Favor de enviar comprobante.`;
+        case 'SUSPENSION': 
+            return `Hola ${nombre}, tu pago de *$${montoMes}* está vencido. Evita la suspensión.`;
+        case 'AGRADECIMIENTO': 
+            return `Gracias ${nombre}, hemos recibido tu pago de *$${montoMes}*.`;
+        case 'ADEUDO': 
+            return `Hola ${nombre}. Usted cuenta con un adeudo total de *$${deudaTotal}*. Le invitamos a saldar su cuenta para evitar la suspensión del servicio.`;
+        default: 
+            return `Hola ${nombre}.`;
     }
 };
 
-export const enviarNotificacion = async (cliente, tipo) => {
+export const enviarNotificacion = async (cliente, tipo, customText = "") => {
     if (!cliente.telefono) return false;
-    const mensaje = getMensajeTemplate(tipo, cliente);
+    
+    const mensaje = tipo === 'CUSTOM' ? customText : getMensajeTemplate(tipo, cliente);
+    
     return await enviarMensajeWhatsApp(cliente.telefono, mensaje);
 };

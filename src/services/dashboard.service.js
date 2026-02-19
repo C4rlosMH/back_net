@@ -19,10 +19,9 @@ export const getDashboardStatsService = async () => {
     const diaHoy = hoy.getDate();
     const diasGracia = [];
     
-    // Calculamos el día de hoy y los 5 días anteriores
     for (let i = 0; i <= 5; i++) {
         let d = diaHoy - i;
-        if (d <= 0) { // Si es inicio de mes, retrocedemos a los últimos días del mes anterior
+        if (d <= 0) { 
             const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
             d = ultimoDiaMesAnterior + d;
         }
@@ -30,18 +29,17 @@ export const getDashboardStatsService = async () => {
     }
 
     const vencimientosEnGracia = await clienteRepo.find({
-        select: ["id", "nombre_completo", "telefono", "direccion", "dia_pago", "saldo_actual"],
+        select: ["id", "nombre_completo", "telefono", "direccion", "dia_pago", "saldo_actual", "saldo_aplazado", "confiabilidad"],
         where: { dia_pago: In(diasGracia), estado: "ACTIVO" },
         relations: ["plan"]
     });
 
-    // Solo mostramos en la lista a los que de verdad siguen debiendo su saldo actual
     const vencimientosPendientes = vencimientosEnGracia.filter(c => Number(c.saldo_actual) > 0);
 
     // --- 2. LOGS ---
     const actividadReciente = await logRepo.find({ order: { fecha: "DESC" }, take: 10 });
 
-    // --- 3. FINANZAS Y METAS QUINCENALES ---
+    // --- 3. FINANZAS Y METAS QUINCENALES (Agrupadas por Ciclo de Facturación) ---
     const clientesActivos = await clienteRepo.find({ where: { estado: "ACTIVO" }, relations: ["plan"] });
     let metaQ1 = 0, metaQ2 = 0;
 
@@ -52,9 +50,10 @@ export const getDashboardStatsService = async () => {
         }
     });
 
-    const finQ1 = new Date(hoy.getFullYear(), hoy.getMonth(), 15, 23, 59, 59);
+    // CORRECCIÓN: Traemos los movimientos CON los datos del cliente para saber a qué grupo pertenecen
     const movimientosMes = await movimientoRepo.find({
-        where: { tipo: "ABONO", fecha: Between(inicioMes, finMes) }
+        where: { tipo: In(["ABONO", "APLAZAMIENTO"]), fecha: Between(inicioMes, finMes) },
+        relations: ["cliente"] 
     });
 
     let recaudadoTotal = 0, efectivo = 0, banco = 0, aplazadosCount = 0;
@@ -62,14 +61,21 @@ export const getDashboardStatsService = async () => {
     let cobradoA_TiempoQ2 = 0, cobradoRecuperadoQ2 = 0;
 
     movimientosMes.forEach(m => {
+        if (m.tipo === "APLAZAMIENTO") {
+            aplazadosCount++;
+            return;
+        }
+
         const monto = Number(m.monto);
         recaudadoTotal += monto;
         if (m.metodo_pago === 'EFECTIVO') efectivo += monto; else banco += monto;
 
         const esRecuperado = m.descripcion && m.descripcion.includes("Recuperación de Adeudo");
-        if (m.descripcion && (m.descripcion.includes("Promesa") || m.descripcion.includes("Aplazado"))) aplazadosCount++;
+        
+        // NUEVA LÓGICA: Evaluamos el 'dia_pago' del cliente, NO la fecha del movimiento
+        const diaPagoCliente = m.cliente ? m.cliente.dia_pago : 15; // Por defecto a Q1 si no hay cliente
 
-        if (m.fecha <= finQ1) {
+        if (diaPagoCliente <= 15) {
             if (esRecuperado) cobradoRecuperadoQ1 += monto; else cobradoA_TiempoQ1 += monto;
         } else {
             if (esRecuperado) cobradoRecuperadoQ2 += monto; else cobradoA_TiempoQ2 += monto;
@@ -78,12 +84,17 @@ export const getDashboardStatsService = async () => {
 
     // --- 4. DEUDA REAL ---
     const listaPendientes = await clienteRepo.createQueryBuilder("c")
-        .select(["c.nombre_completo", "c.telefono", "c.direccion", "c.saldo_actual", "c.saldo_aplazado", "c.confiabilidad"])
-        .where("c.saldo_actual > 0 OR c.saldo_aplazado > 0")
+        .select(["c.id", "c.nombre_completo", "c.telefono", "c.direccion", "c.saldo_actual", "c.saldo_aplazado", "c.confiabilidad", "c.dia_pago", "c.estado"])
+        .where("(c.saldo_actual > 0 OR c.saldo_aplazado > 0)")
         .andWhere("c.estado != :baja", { baja: "BAJA" })
         .getMany();
     
     const deudaTotalReales = listaPendientes.reduce((acc, c) => acc + Number(c.saldo_actual) + Number(c.saldo_aplazado), 0);
+
+    const clientesEnRiesgoCount = await clienteRepo.createQueryBuilder("c")
+        .where("c.confiabilidad < 60")
+        .andWhere("c.estado != :baja", { baja: "BAJA" })
+        .getCount();
 
     // --- 5. OPERATIVO ---
     const totalClientes = await clienteRepo.count();
@@ -94,6 +105,27 @@ export const getDashboardStatsService = async () => {
     const stockRouter = await equipoRepo.count({ where: { tipo: "ROUTER", estado: "ALMACEN" } });
     const stockAntena = await equipoRepo.count({ where: { tipo: "ANTENA", estado: "ALMACEN" } });
     const stockOnu = await equipoRepo.count({ where: { tipo: "ONU", estado: "ALMACEN" } });
+
+    // --- 6. GRÁFICA DE INGRESOS ---
+    const graficaIngresos = [];
+    const mesesNombres = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+    
+    for (let i = 5; i >= 0; i--) {
+        const targetMonth = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        const firstDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+        const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59);
+
+        const result = await movimientoRepo.createQueryBuilder("m")
+            .select("SUM(m.monto)", "total")
+            .where("m.tipo = :tipo", { tipo: "ABONO" })
+            .andWhere("m.fecha >= :start AND m.fecha <= :end", { start: firstDay, end: lastDay })
+            .getRawOne();
+
+        graficaIngresos.push({
+            name: mesesNombres[targetMonth.getMonth()],
+            total: result.total ? Number(result.total) : 0
+        });
+    }
 
     return {
         financiero: {
@@ -112,8 +144,12 @@ export const getDashboardStatsService = async () => {
             actividad_reciente: actividadReciente
         },
         pendientes_pago: { total_deuda: deudaTotalReales, lista: listaPendientes },
-        clientes: { total: totalClientes, resumen: { activos, suspendidos, cortados } },
+        clientes: { 
+            total: totalClientes, 
+            resumen: { activos, suspendidos, cortados, en_riesgo: clientesEnRiesgoCount } 
+        },
         inventario_disponible: { routers: stockRouter, antenas: stockAntena, onus: stockOnu },
-        graficaIngresos: [], graficaPlanes: []
+        graficaIngresos: graficaIngresos,
+        graficaPlanes: []
     };
 };
