@@ -18,3 +18,7 @@ yarn-error.log*
 # VS Code
 .vscode/
 !.vscode/extensions.json
+
+
+.wwebjs_auth/
+.wwebjs_cache/
