@@ -2,6 +2,11 @@ import "reflect-metadata";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import helmet from "helmet"; // <--- SEGURIDAD
+import compression from "compression"; // <--- OPTIMIZACIÓN
+import morgan from "morgan"; // <--- MONITOREO
+import rateLimit from "express-rate-limit"; // <--- PROTECCIÓN
+
 import { AppDataSource } from "./config/data-source.js";
 import {createAdminUser} from "./utils/initialSetup.js";
 import {seedDatabase} from "./utils/seedDatabase.js";
@@ -29,11 +34,44 @@ import cierreRoutes from "./routes/cierre.routes.js"; // <--- IMPORTAR RUTAS DE 
 dotenv.config();
 const app = express();
 
-// Middlewares Globales
+// --- 1. MIDDLEWARES DE SEGURIDAD Y OPTIMIZACIÓN ---
+
+// Helmet: Añade cabeceras HTTP de seguridad
+app.use(helmet()); 
+
+// Compression: Comprime las respuestas (JSON) para ahorrar ancho de banda
+app.use(compression()); 
+
+// Morgan: Imprime en consola las peticiones entrantes (útil para ver qué está pasando)
+app.use(morgan("dev"));
+
+// Rate Limiter: Previene ataques de fuerza bruta o bugs que saturen el servidor
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 5000, // Límite de 1000 peticiones por IP cada 15 minutos (suficiente para uso interno)
+    message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo más tarde."
+});
+app.use("/api/", limiter);
+
+// --- 2. CONFIGURACIÓN DE CORS (Adaptado para Red Local) ---
+const allowedOrigins = [
+    'http://localhost:5173', // Tu frontend en modo desarrollo
+    'http://localhost:5000', // Tu frontend compilado con 'serve' local
+    process.env.FRONTEND_URL // IP de la red local (Configúralo en tu .env del backend)
+];
+
 app.use(cors({
-    origin: 'http://localhost:5173', // O el puerto de tu frontend
-    credentials: true
+    origin: function (origin, callback) {
+        // Permitir peticiones sin origen (como Postman) o si el origen está en la lista permitida
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Bloqueado por CORS'));
+        }
+    },
+    credentials: true // Necesario para enviar cookies o headers de autorización
 }));
+
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
@@ -69,7 +107,7 @@ async function main() {
 
         //await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA
         // 2. Iniciar Servidor Express
-        app.listen(PORT, () => {
+        app.listen(PORT,'0.0.0.0' , () => {
             console.log(`Servidor corriendo en http://localhost:${PORT}`);
         });
 

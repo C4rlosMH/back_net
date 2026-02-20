@@ -11,7 +11,7 @@ const movimientoRepo = AppDataSource.getRepository(MovimientoFinanciero);
 export const iniciarCronSuspension = () => {
     // Se ejecuta a las 10:00 AM
     cron.schedule('0 10 * * *', async () => {
-        console.log("CRON [Suspensión]: Revisando clientes para cortes estrictos...");
+        console.log("CRON [Suspensión]: Revisando clientes para cortes estrictos (Límite 5 meses)...");
         
         try {
             const clientesActivos = await clienteRepo.find({
@@ -24,9 +24,11 @@ export const iniciarCronSuspension = () => {
             for (const cliente of clientesActivos) {
                 if (cliente.plan) {
                     const costoPlan = Number(cliente.plan.precio_mensual);
-                    const deudaNuevaTotal = Number(cliente.saldo_actual) + Number(cliente.saldo_aplazado);
+                    // La deuda corriente es la suma del saldo vencido y el saldo del periodo actual
+                    const deudaCorriente = Number(cliente.saldo_actual) + Number(cliente.saldo_aplazado);
 
-                    if (deudaNuevaTotal >= costoPlan && costoPlan > 0) {
+                    // Se suspende si la deuda alcanza o supera los 5 MESES (costoPlan * 5).
+                    if (deudaCorriente >= (costoPlan * 5) && costoPlan > 0) {
                         cliente.estado = "SUSPENDIDO";
                         await clienteRepo.save(cliente);
                         suspendidosCount++;
@@ -34,7 +36,7 @@ export const iniciarCronSuspension = () => {
                         const movimientoCorte = movimientoRepo.create({
                             tipo: "CARGO_MENSUAL", 
                             monto: 0,
-                            descripcion: `Servicio Suspendido (Deuda Activa: $${deudaNuevaTotal})`,
+                            descripcion: `Servicio Suspendido (Deuda Corriente Acumulada: $${deudaCorriente})`,
                             cliente: cliente
                         });
                         await movimientoRepo.save(movimientoCorte);
@@ -46,7 +48,7 @@ export const iniciarCronSuspension = () => {
                 const log = logRepo.create({
                     usuario: "SISTEMA",
                     accion: "SUSPENSION_AUTOMATICA",
-                    detalles: `Se suspendió el servicio a ${suspendidosCount} clientes por exceder el límite de deuda.`
+                    detalles: `Se suspendió el servicio a ${suspendidosCount} clientes por exceder el límite de 5 meses de deuda corriente.`
                 });
                 await logRepo.save(log);
             }
