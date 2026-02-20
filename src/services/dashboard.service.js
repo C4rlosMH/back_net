@@ -85,7 +85,8 @@ export const getDashboardStatsService = async () => {
     // --- 4. DEUDA REAL ---
     const listaPendientes = await clienteRepo.createQueryBuilder("c")
         .select(["c.id", "c.nombre_completo", "c.telefono", "c.direccion", "c.saldo_actual", "c.saldo_aplazado", "c.confiabilidad", "c.dia_pago", "c.estado"])
-        .where("(c.saldo_actual > 0 OR c.saldo_aplazado > 0)")
+        // CORRECCIÓN: Solo consideramos morosos a los que tienen deuda actual vencida o ya están cortados
+        .where("(c.saldo_actual > 0 OR c.estado = 'CORTADO')") 
         .andWhere("c.estado != :baja", { baja: "BAJA" })
         .getMany();
     

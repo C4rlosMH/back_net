@@ -11,6 +11,7 @@ import { iniciarCronFacturacion } from "./crons/facturacion.cron.js";
 import { iniciarCronPenalizacion } from "./crons/penalizacion.cron.js";
 import { iniciarCronWhatsApp } from "./crons/whatsapp.cron.js";
 import { iniciarCronSuspension } from "./crons/suspencion.cron.js";
+import { iniciarCronCierres } from "./crons/cierre.cron.js";
 
 //importar rutas
 import clienteRoutes from "./routes/cliente.routes.js";
@@ -23,6 +24,7 @@ import planRoutes from "./routes/plan.routes.js";
 import cajaRoutes from "./routes/caja.routes.js";
 import logRoutes from "./routes/log.routes.js";
 import whatsappRoutes from "./routes/whatsapp.routes.js"; // <--- IMPORTAR
+import cierreRoutes from "./routes/cierre.routes.js"; // <--- IMPORTAR RUTAS DE CIERRE
 
 dotenv.config();
 const app = express();
@@ -47,6 +49,7 @@ app.use("/api/planes", planRoutes);
 app.use("/api/cajas", cajaRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/whatsapp", whatsappRoutes); // <--- USAR RUTAS DE WHATSAPP
+app.use("/api/cierres", cierreRoutes); // <--- USAR RUTAS DE CIERRE
 
 const PORT = process.env.PORT;
 
@@ -62,6 +65,7 @@ async function main() {
         iniciarCronPenalizacion();
         iniciarCronWhatsApp();
         iniciarCronSuspension()
+        iniciarCronCierres()
 
         //await seedDatabase(); // <--- EJECUCIÓN AUTOMÁTICA
         // 2. Iniciar Servidor Express

@@ -13,12 +13,16 @@ export const getClientes = async (req, res) => {
     try {
         const clienteRepo = AppDataSource.getRepository(Cliente);
         
-        // Obtenemos los parámetros de la URL (por defecto página 1, límite 10)
+        // Obtenemos los parámetros de la URL
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         const search = req.query.search || "";
         const tab = req.query.tab || "TODOS";
+        
+        // 1. CAPTURAR PARÁMETROS DE ORDENAMIENTO
+        const sortKey = req.query.sortKey || "nombre_completo";
+        const sortDir = req.query.sortDir ? req.query.sortDir.toUpperCase() : "ASC";
 
         // Construcción de la consulta con filtros básicos
         const queryBuilder = clienteRepo.createQueryBuilder("cliente")
@@ -26,12 +30,10 @@ export const getClientes = async (req, res) => {
             .leftJoinAndSelect("cliente.caja", "caja")
             .leftJoinAndSelect("cliente.equipos", "equipos");
 
-        // Filtro por Tab (Estado)
         if (tab !== "TODOS") {
             queryBuilder.andWhere("cliente.estado = :tab", { tab });
         }
 
-        // Filtro por búsqueda (Nombre o IP)
         if (search) {
             queryBuilder.andWhere(
                 "(cliente.nombre_completo LIKE :search OR cliente.ip_asignada LIKE :search)",
@@ -39,11 +41,15 @@ export const getClientes = async (req, res) => {
             );
         }
 
-        // Ejecutamos la consulta con paginación
+        // 2. APLICAR ORDENAMIENTO DINÁMICO
+        // Validamos la columna para evitar inyección SQL u errores con TypeORM
+        const validColumns = ["nombre_completo", "tipo_conexion", "ip_asignada", "estado", "saldo_actual"];
+        const columnaReal = validColumns.includes(sortKey) ? `cliente.${sortKey}` : "cliente.nombre_completo";
+
         const [clientes, total] = await queryBuilder
             .skip(skip)
             .take(limit)
-            .orderBy("cliente.nombre_completo", "ASC")
+            .orderBy(columnaReal, sortDir) // Reemplazamos el string fijo aquí
             .getManyAndCount();
 
         res.json({
