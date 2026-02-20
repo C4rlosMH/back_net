@@ -44,12 +44,12 @@ Crea un archivo llamado `.env` dentro de la carpeta `back_net/` con la configura
 ```env
 PORT=4000
 DB_HOST=mysql-db
-DB_PORT=3306
-DB_USER=app_miranda
-DB_PASSWORD=tu_password_segura
-DB_NAME=miranda_db
-JWT_SECRET=tu_secreto_jwt
-FRONTEND_URL=[http://192.168.1.](http://192.168.1.)XX:5000
+DB_PORT=3306  #Cambiar de ser necesario por el puerto de la BD
+DB_USER=app_user #Se recomienda usar un usuario exclusivo para el uso del sistema, no usar el usuario ROOT
+DB_PASSWORD=tu_password_segura #Usar la password del usuario del sistema, no el ROOT
+DB_NAME=mi_db #Cambiar por el nombre de la base de datos
+JWT_SECRET=tu_secreto_jwt #Cambiar por una password más segura
+FRONTEND_URL=[http://192.168.1.](http://192.168.1.)XX:5000  #Apuntar a la IP de la maquina o del Frontend
 ```
 
 ### 2. Variables del Frontend
