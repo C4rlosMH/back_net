@@ -50,6 +50,9 @@ export const Cliente = new EntitySchema({
 
         createdAt: { createDate: true },
     },
+
+    
+
     relations: {
         plan: {
             type: "many-to-one",

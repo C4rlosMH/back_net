@@ -39,7 +39,7 @@ export const getDashboardStatsService = async () => {
     // --- 2. LOGS ---
     const actividadReciente = await logRepo.find({ order: { fecha: "DESC" }, take: 10 });
 
-    // --- 3. FINANZAS Y METAS QUINCENALES (Agrupadas por Ciclo de Facturación) ---
+    // --- 3. FINANZAS Y METAS QUINCENALES ---
     const clientesActivos = await clienteRepo.find({ where: { estado: "ACTIVO" }, relations: ["plan"] });
     let metaQ1 = 0, metaQ2 = 0;
 
@@ -50,7 +50,6 @@ export const getDashboardStatsService = async () => {
         }
     });
 
-    // CORRECCIÓN: Traemos los movimientos CON los datos del cliente para saber a qué grupo pertenecen
     const movimientosMes = await movimientoRepo.find({
         where: { tipo: In(["ABONO", "APLAZAMIENTO"]), fecha: Between(inicioMes, finMes) },
         relations: ["cliente"] 
@@ -71,9 +70,7 @@ export const getDashboardStatsService = async () => {
         if (m.metodo_pago === 'EFECTIVO') efectivo += monto; else banco += monto;
 
         const esRecuperado = m.descripcion && m.descripcion.includes("Recuperación de Adeudo");
-        
-        // NUEVA LÓGICA: Evaluamos el 'dia_pago' del cliente, NO la fecha del movimiento
-        const diaPagoCliente = m.cliente ? m.cliente.dia_pago : 15; // Por defecto a Q1 si no hay cliente
+        const diaPagoCliente = m.cliente ? m.cliente.dia_pago : 15;
 
         if (diaPagoCliente <= 15) {
             if (esRecuperado) cobradoRecuperadoQ1 += monto; else cobradoA_TiempoQ1 += monto;
@@ -85,7 +82,6 @@ export const getDashboardStatsService = async () => {
     // --- 4. DEUDA REAL ---
     const listaPendientes = await clienteRepo.createQueryBuilder("c")
         .select(["c.id", "c.nombre_completo", "c.telefono", "c.direccion", "c.saldo_actual", "c.saldo_aplazado", "c.confiabilidad", "c.dia_pago", "c.estado"])
-        // CORRECCIÓN: Solo consideramos morosos a los que tienen deuda actual vencida o ya están cortados
         .where("(c.saldo_actual > 0 OR c.estado = 'CORTADO')") 
         .andWhere("c.estado != :baja", { baja: "BAJA" })
         .getMany();
@@ -107,7 +103,7 @@ export const getDashboardStatsService = async () => {
     const stockAntena = await equipoRepo.count({ where: { tipo: "ANTENA", estado: "ALMACEN" } });
     const stockOnu = await equipoRepo.count({ where: { tipo: "ONU", estado: "ALMACEN" } });
 
-    // --- 6. GRÁFICA DE INGRESOS ---
+    // --- 6. GRÁFICA DE INGRESOS (Últimos 6 meses) ---
     const graficaIngresos = [];
     const mesesNombres = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
     
@@ -126,6 +122,39 @@ export const getDashboardStatsService = async () => {
             name: mesesNombres[targetMonth.getMonth()],
             total: result.total ? Number(result.total) : 0
         });
+    }
+
+    // --- 7. COMPARATIVA ANUAL (Mes a Mes por Año) ---
+    const todosLosAbonos = await movimientoRepo.find({
+        select: ["fecha", "monto"],
+        where: { tipo: "ABONO" }
+    });
+
+    const datosPorAnio = {};
+    const aniosPresentes = new Set();
+
+    todosLosAbonos.forEach(m => {
+        const d = new Date(m.fecha);
+        const y = d.getFullYear();
+        const mo = d.getMonth(); // 0 a 11
+        
+        if (!datosPorAnio[mo]) datosPorAnio[mo] = { name: mesesNombres[mo] };
+        if (!datosPorAnio[mo][y]) datosPorAnio[mo][y] = 0;
+        
+        datosPorAnio[mo][y] += Number(m.monto);
+        aniosPresentes.add(y);
+    });
+
+    const comparativaAnual = [];
+    const listaAnios = Array.from(aniosPresentes).sort();
+    
+    // Rellenamos para que siempre devuelva los 12 meses
+    for (let i = 0; i < 12; i++) {
+        const mesData = datosPorAnio[i] || { name: mesesNombres[i] };
+        listaAnios.forEach(a => {
+            if (mesData[a] === undefined) mesData[a] = 0;
+        });
+        comparativaAnual.push(mesData);
     }
 
     return {
@@ -151,6 +180,6 @@ export const getDashboardStatsService = async () => {
         },
         inventario_disponible: { routers: stockRouter, antenas: stockAntena, onus: stockOnu },
         graficaIngresos: graficaIngresos,
-        graficaPlanes: []
+        comparativaAnual: { datos: comparativaAnual, anios: listaAnios } // Agregado aquí
     };
 };

@@ -23,10 +23,9 @@ export const generarCargoMensualService = async (clienteId) => {
 
     const movimientosAGuardar = [movCargo];
 
-    // --- LÓGICA DE AUTO-PAGO CON SALDO A FAVOR ---
+    // --- LOGICA DE AUTO-PAGO CON SALDO A FAVOR ---
     let saldoFavor = Number(cliente.saldo_a_favor || 0);
     if (saldoFavor > 0) {
-        // Tomamos lo que necesitemos para pagar (o todo lo que tenga si no le alcanza)
         const cobroAutomatico = Math.min(cliente.saldo_actual, saldoFavor);
         
         cliente.saldo_a_favor = saldoFavor - cobroAutomatico;
@@ -36,7 +35,7 @@ export const generarCargoMensualService = async (clienteId) => {
             tipo: "ABONO",
             monto: cobroAutomatico,
             descripcion: "Auto-pago descontado del Saldo a Favor",
-            metodo_pago: "SISTEMA", // Dinero que ya estaba en el sistema
+            metodo_pago: "SISTEMA",
             cliente: cliente
         });
         movimientosAGuardar.push(movAutoCobro);
@@ -58,9 +57,8 @@ export const registrarPagoService = async (data) => {
 
     let montoPago = Number(data.monto);
 
-    // --- LÓGICA DE APLAZAMIENTO (PRÓRROGA MANUAL) ---
+    // --- LOGICA DE APLAZAMIENTO (PRORROGA MANUAL) ---
     if (data.tipo_pago === 'APLAZADO') {
-        // ... (Tu código actual de aplazamiento se queda exactamente igual) ...
         cliente.saldo_actual = Number(cliente.saldo_actual) - montoPago;
         if (cliente.saldo_actual < 0) cliente.saldo_actual = 0; 
         
@@ -73,7 +71,7 @@ export const registrarPagoService = async (data) => {
         const aplazamiento = movimientoRepository.create({
             tipo: "APLAZAMIENTO",
             monto: montoPago,
-            descripcion: data.descripcion ? `Prórroga/Aplazamiento | ${data.descripcion}` : "Deuda movida a meses posteriores",
+            descripcion: data.descripcion ? `Prorroga/Aplazamiento | ${data.descripcion}` : "Deuda movida a meses posteriores",
             mes_servicio: data.mes_servicio || null,
             metodo_pago: "SISTEMA", 
             referencia: null,
@@ -93,13 +91,20 @@ export const registrarPagoService = async (data) => {
         };
     }
 
-    // --- LÓGICA NORMAL DE PAGOS EN CASCADA ---
+    // --- LOGICA NORMAL DE PAGOS EN CASCADA ---
+    let montoEfectivo = Number(data.monto || 0);
+    let montoDescuento = Number(data.monto_descuento || 0);
+    
+    montoPago = montoEfectivo + montoDescuento;
+
+    if (montoPago <= 0) throw new Error("El monto total de la operacion debe ser mayor a 0");
+
     let abonoCorriente = 0;
     let abonoAplazado = 0;
     let abonoHistorico = 0;
     let sobrante = 0;
 
-    // 1. Pagar deuda corriente (Prioridad para evitar corte actual)
+    // 1. Pagar deuda corriente
     let deudaCorriente = Math.max(0, Number(cliente.saldo_actual));
     if (montoPago > 0 && deudaCorriente > 0) {
         if (montoPago >= deudaCorriente) {
@@ -113,7 +118,7 @@ export const registrarPagoService = async (data) => {
         }
     }
 
-    // 2. Pagar deuda aplazada (Prórrogas recientes)
+    // 2. Pagar deuda aplazada
     let deudaAplazada = Math.max(0, Number(cliente.saldo_aplazado));
     if (montoPago > 0 && deudaAplazada > 0) {
         if (montoPago >= deudaAplazada) {
@@ -127,7 +132,7 @@ export const registrarPagoService = async (data) => {
         }
     }
 
-    // 3. Pagar DEUDA HISTÓRICA (El arrastre viejo)
+    // 3. Pagar DEUDA HISTORICA
     let deudaHistorica = Math.max(0, Number(cliente.deuda_historica || 0));
     if (montoPago > 0 && deudaHistorica > 0) {
         if (montoPago >= deudaHistorica) {
@@ -147,12 +152,12 @@ export const registrarPagoService = async (data) => {
         cliente.saldo_a_favor = Number(cliente.saldo_a_favor || 0) + sobrante;
     }
 
-    // Reactivar al cliente si pagó algo y estaba suspendido
+    // Reactivar al cliente
     if ((abonoCorriente > 0 || abonoAplazado > 0 || abonoHistorico > 0 || sobrante > 0) && (cliente.estado === "CORTADO" || cliente.estado === "SUSPENDIDO")) {
         cliente.estado = "ACTIVO"; 
     }
 
-    // ... (Tu lógica de Confiabilidad se queda igual aquí) ...
+    // Logica de Confiabilidad
     if (data.motivo_retraso !== 'logistica' && data.motivo_retraso !== 'acuerdo') {
         const hoy = new Date();
         const diaActual = hoy.getDate();
@@ -173,23 +178,33 @@ export const registrarPagoService = async (data) => {
         }
     }
 
-    // Construir la descripción del ticket dinámicamente
+    // Construir la descripcion del ticket dinamicamente
     let descBase = "Abono general";
-    if (data.tipo_pago === 'LIQUIDACION') descBase = `Liquidación - ${data.mes_servicio || 'Saldo'}`;
+    if (data.tipo_pago === 'LIQUIDACION') descBase = `Liquidacion - ${data.mes_servicio || 'Saldo'}`;
     else if (data.mes_servicio) descBase = `Abono Mes: ${data.mes_servicio}`;
 
+    if (montoDescuento > 0) {
+        if (sobrante > 0) {
+            descBase = `Descuento por deuda (Saldo a favor generado) | ${descBase}`;
+        } else {
+            descBase = `Se salda deuda con el cliente | ${descBase}`;
+        }
+    }
+
     if (abonoCorriente > 0) descBase = `Mes Corriente ($${abonoCorriente}) | ${descBase}`;
-    if (abonoAplazado > 0) descBase = `Abono Prórroga ($${abonoAplazado}) | ${descBase}`;
-    if (abonoHistorico > 0) descBase = `Abono a Deuda Histórica ($${abonoHistorico}) | ${descBase}`;
+    if (abonoAplazado > 0) descBase = `Abono Prorroga ($${abonoAplazado}) | ${descBase}`;
+    if (abonoHistorico > 0) descBase = `Abono a Deuda Historica ($${abonoHistorico}) | ${descBase}`;
     if (sobrante > 0) descBase = `${descBase} | Quedan $${sobrante.toFixed(2)} a favor`;
     if (data.descripcion && data.descripcion.trim() !== "") descBase = `${descBase} | Nota: ${data.descripcion.trim()}`;
 
+    const metodoFinal = (montoEfectivo === 0 && montoDescuento > 0) ? "SISTEMA" : (data.metodo_pago || "EFECTIVO");
+
     const pago = movimientoRepository.create({
         tipo: "ABONO",
-        monto: Number(data.monto), 
+        monto: montoEfectivo + montoDescuento, 
         descripcion: descBase, 
         mes_servicio: data.mes_servicio || null,
-        metodo_pago: data.metodo_pago || "EFECTIVO",
+        metodo_pago: metodoFinal,
         referencia: data.referencia || null,
         cliente: cliente
     });
@@ -200,9 +215,9 @@ export const registrarPagoService = async (data) => {
     });
 
     return { 
-        mensaje: sobrante > 0 ? `Pago procesado. $${sobrante.toFixed(2)} a favor.` : "Pago registrado exitosamente", 
+        mensaje: sobrante > 0 ? `Operacion procesada. $${sobrante.toFixed(2)} a favor.` : "Operacion registrada exitosamente", 
         saldo_restante: cliente.saldo_actual,
-        deuda_historica_restante: cliente.deuda_historica, // Te devuelvo este dato al front por si lo necesitas
+        deuda_historica_restante: cliente.deuda_historica, 
         nueva_confiabilidad: cliente.confiabilidad
     };
 };

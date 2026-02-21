@@ -29,6 +29,9 @@ export const MovimientoFinanciero = new EntitySchema({
         
         usuario_responsable: { type: "varchar", nullable: true }, 
     },
+
+        
+
     relations: {
         cliente: {
             type: "many-to-one",

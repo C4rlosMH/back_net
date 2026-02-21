@@ -3,7 +3,7 @@ import { Cliente } from "../entities/Cliente.js";
 import { Equipo } from "../entities/Equipo.js"; 
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { In } from "typeorm"; 
-import { registrarLog } from "../services/log.service.js"; // Importamos el servicio de logs
+import { registrarLog } from "../services/log.service.js"; 
 
 const clienteRepo = AppDataSource.getRepository(Cliente);
 const equipoRepo = AppDataSource.getRepository(Equipo);
@@ -11,20 +11,16 @@ const movimientoRepo = AppDataSource.getRepository(MovimientoFinanciero);
 
 export const getClientes = async (req, res) => {
     try {
-        const clienteRepo = AppDataSource.getRepository(Cliente);
-        
-        // Obtenemos los parámetros de la URL
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         const search = req.query.search || "";
         const tab = req.query.tab || "TODOS";
         
-        // 1. CAPTURAR PARÁMETROS DE ORDENAMIENTO
         const sortKey = req.query.sortKey || "nombre_completo";
         const sortDir = req.query.sortDir ? req.query.sortDir.toUpperCase() : "ASC";
+        const conexion = req.query.conexion || "TODAS"; 
 
-        // Construcción de la consulta con filtros básicos
         const queryBuilder = clienteRepo.createQueryBuilder("cliente")
             .leftJoinAndSelect("cliente.plan", "plan")
             .leftJoinAndSelect("cliente.caja", "caja")
@@ -34,6 +30,12 @@ export const getClientes = async (req, res) => {
             queryBuilder.andWhere("cliente.estado = :tab", { tab });
         }
 
+        if (conexion === "FIBRA") {
+            queryBuilder.andWhere("cliente.tipo_conexion = 'fibra' AND caja.id IS NOT NULL");
+        } else if (conexion === "RADIO") {
+            queryBuilder.andWhere("(cliente.tipo_conexion = 'radio' OR caja.id IS NULL)");
+        }
+
         if (search) {
             queryBuilder.andWhere(
                 "(cliente.nombre_completo LIKE :search OR cliente.ip_asignada LIKE :search)",
@@ -41,15 +43,21 @@ export const getClientes = async (req, res) => {
             );
         }
 
-        // 2. APLICAR ORDENAMIENTO DINÁMICO
-        // Validamos la columna para evitar inyección SQL u errores con TypeORM
+        // --- SOLUCIÓN AL ERROR DE ORDENAMIENTO ---
+        // Se utilizan las columnas físicas directas para evitar que el compilador de TypeORM falle.
         const validColumns = ["nombre_completo", "tipo_conexion", "ip_asignada", "estado", "saldo_actual"];
         const columnaReal = validColumns.includes(sortKey) ? `cliente.${sortKey}` : "cliente.nombre_completo";
+        
+        queryBuilder.orderBy(columnaReal, sortDir);
+
+        // Si se ordenó por conexión, añadimos un orden secundario alfabético
+        if (sortKey === "tipo_conexion") {
+            queryBuilder.addOrderBy("cliente.nombre_completo", "ASC");
+        }
 
         const [clientes, total] = await queryBuilder
             .skip(skip)
             .take(limit)
-            .orderBy(columnaReal, sortDir) // Reemplazamos el string fijo aquí
             .getManyAndCount();
 
         res.json({
@@ -59,7 +67,8 @@ export const getClientes = async (req, res) => {
             currentPage: page
         });
     } catch (error) {
-        res.status(500).json({ message: "Error al obtener clientes" });
+        console.error("=== ERROR EN GET CLIENTES ===", error);
+        res.status(500).json({ message: "Error al obtener clientes", error: error.message });
     }
 };
 
@@ -82,9 +91,8 @@ export const createCliente = async (req, res) => {
             );
         }
 
-        // --- REGISTRO DE LOG ---
         registrarLog(
-            req.usuario?.nombre || "Administrador", // Puedes ajustarlo si tienes los datos del usuario logueado en req
+            req.usuario?.nombre || "Administrador", 
             "CREAR_CLIENTE",
             `Se registro el nuevo cliente: ${savedCliente.nombre_completo}`,
             "Cliente",
@@ -111,7 +119,6 @@ export const updateCliente = async (req, res) => {
 
         const nombreAnterior = cliente.nombre_completo;
 
-        // 1. Actualizar datos basicos
         clienteRepo.merge(cliente, {
             ...data,
             plan: planId ? { id: planId } : null,
@@ -119,7 +126,6 @@ export const updateCliente = async (req, res) => {
         });
         await clienteRepo.save(cliente);
 
-        // 2. Gestion de Equipos (Si se envia una nueva lista)
         if (equiposIds) {
             if (cliente.equipos && cliente.equipos.length > 0) {
                 const idsAnteriores = cliente.equipos.map(e => e.id);
@@ -137,7 +143,6 @@ export const updateCliente = async (req, res) => {
             }
         }
 
-        // --- REGISTRO DE LOG ---
         registrarLog(
             req.usuario?.nombre || "Administrador",
             "ACTUALIZAR_CLIENTE",
@@ -170,7 +175,6 @@ export const deleteCliente = async (req, res) => {
     try {
         const { id } = req.params;
         
-        // 1. Buscar al cliente para verificar que equipos tiene asignados
         const cliente = await clienteRepo.findOne({
             where: { id: parseInt(id) },
             relations: ["equipos"]
@@ -178,7 +182,6 @@ export const deleteCliente = async (req, res) => {
 
         if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
 
-        // 2. Liberar los equipos (ponerlos en ALMACEN y desvincularlos del cliente)
         if (cliente.equipos && cliente.equipos.length > 0) {
             const equiposIds = cliente.equipos.map(e => e.id);
             await equipoRepo.update(
@@ -187,13 +190,9 @@ export const deleteCliente = async (req, res) => {
             );
         }
 
-        // 3. Eliminar los movimientos financieros (historial de pagos) de este cliente
         await movimientoRepo.delete({ cliente: { id: parseInt(id) } });
-
-        // 4. Eliminar el cliente
         await clienteRepo.delete({ id: parseInt(id) });
         
-        // --- REGISTRO DE LOG ---
         registrarLog(
             req.usuario?.nombre || "Administrador",
             "ELIMINAR_CLIENTE",
