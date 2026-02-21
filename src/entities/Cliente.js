@@ -51,7 +51,11 @@ export const Cliente = new EntitySchema({
         createdAt: { createDate: true },
     },
 
-    
+    indices: [
+        { columns: ["estado"] },
+        { columns: ["dia_pago"] },
+        { columns: ["saldo_actual"] }
+    ],
 
     relations: {
         plan: {

@@ -30,7 +30,11 @@ export const MovimientoFinanciero = new EntitySchema({
         usuario_responsable: { type: "varchar", nullable: true }, 
     },
 
-        
+    indices: [
+        { columns: ["tipo"] },
+        { columns: ["fecha"] },
+        { columns: ["tipo", "fecha"] }
+    ],  
 
     relations: {
         cliente: {
