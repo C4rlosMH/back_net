@@ -30,6 +30,8 @@ import cajaRoutes from "./routes/caja.routes.js";
 import logRoutes from "./routes/log.routes.js";
 import whatsappRoutes from "./routes/whatsapp.routes.js"; // <--- IMPORTAR
 import cierreRoutes from "./routes/cierre.routes.js"; // <--- IMPORTAR RUTAS DE CIERRE
+import gastoRoutes from "./routes/gasto.routes.js";
+import insumoRoutes from "./routes/insumo.routes.js";
 
 dotenv.config();
 const app = express();
@@ -88,6 +90,8 @@ app.use("/api/cajas", cajaRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/whatsapp", whatsappRoutes); // <--- USAR RUTAS DE WHATSAPP
 app.use("/api/cierres", cierreRoutes); // <--- USAR RUTAS DE CIERRE
+app.use("/api/gastos", gastoRoutes);
+app.use("/api/insumos", insumoRoutes);
 
 const PORT = process.env.PORT;
 

@@ -9,7 +9,11 @@ import { Cliente } from "../entities/Cliente.js";
 import { Equipo } from "../entities/Equipo.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { SystemLog } from "../entities/SystemLog.js";
-import { CierreQuincenal } from "../entities/CierreQuincenal.js"; // <--- NUEVA IMPORTACION
+import { CierreQuincenal } from "../entities/CierreQuincenal.js";
+
+// --- NUEVAS IMPORTACIONES ---
+import { Gasto } from "../entities/Gasto.js";
+import { Insumo } from "../entities/Insumo.js";
 
 dotenv.config();
 
@@ -30,7 +34,10 @@ export const AppDataSource = new DataSource({
         Equipo,
         MovimientoFinanciero,
         SystemLog,
-        CierreQuincenal // <--- AGREGADO AQUI
+        CierreQuincenal,
+        // --- AGREGADAS AQUI ---
+        Gasto,
+        Insumo
     ],
     migrations: [],
     subscribers: [],
