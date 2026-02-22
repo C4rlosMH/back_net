@@ -1,5 +1,7 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Insumo } from "../entities/Insumo.js";
+import { registrarLog } from "../services/log.service.js";
+import { Like } from "typeorm"; 
 
 const insumoRepository = AppDataSource.getRepository(Insumo);
 
@@ -38,24 +40,20 @@ export const obtenerInsumos = async (req, res) => {
         const todosLosInsumos = await insumoRepository.find({ order: { nombre: "ASC" } });
         
         // CÁLCULOS INTELIGENTES Y A PRUEBA DE ERRORES
-        // 1. Cable de Fibra (Debe decir fibra y medirse en Metros)
         const kpiFibra = todosLosInsumos
             .filter(i => normalizeStr(i.nombre).includes('fibra') && i.unidad_medida === 'Metros')
             .reduce((sum, i) => sum + Number(i.cantidad), 0);
             
-        // 2. Cable UTP (Debe decir utp o cat y medirse en Metros)
         const kpiUTP = todosLosInsumos
             .filter(i => (normalizeStr(i.nombre).includes('utp') || normalizeStr(i.nombre).includes('cat')) && i.unidad_medida === 'Metros')
             .reduce((sum, i) => sum + Number(i.cantidad), 0);
             
-        // 3. Conectores RJ45 (Dice rj45, o dice conector pero NO dice fibra)
         const kpiConectoresRJ45 = todosLosInsumos
             .filter(i => {
                 const n = normalizeStr(i.nombre);
                 return (n.includes('rj45') || (n.includes('conector') && !n.includes('fibra') && !n.includes('fast'))) && i.unidad_medida === 'Piezas';
             }).reduce((sum, i) => sum + Number(i.cantidad), 0);
 
-        // 4. Conectores Fibra (Fast connectors / Empalmes)
         const kpiConectoresFibra = todosLosInsumos
             .filter(i => {
                 const n = normalizeStr(i.nombre);
@@ -80,7 +78,7 @@ export const obtenerInsumos = async (req, res) => {
     }
 };
 
-// Registrar un nuevo tipo de material (ej. "Bobina de cable UTP")
+// Registrar un nuevo tipo de material
 export const crearInsumo = async (req, res) => {
     try {
         const { nombre, cantidad, unidad_medida } = req.body;
@@ -96,6 +94,16 @@ export const crearInsumo = async (req, res) => {
         });
 
         const resultado = await insumoRepository.save(nuevoInsumo);
+
+        // --- REGISTRO DE AUDITORÍA ---
+        registrarLog(
+            req.user?.username || "Administrador",
+            "CREAR_INSUMO",
+            `Se registró un nuevo insumo al catálogo: "${nombre}" (Stock inicial: ${cantidad} ${unidad_medida})`,
+            "Insumo",
+            resultado.id
+        );
+
         res.status(201).json(resultado);
     } catch (error) {
         console.error("Error al crear insumo:", error);
@@ -107,7 +115,7 @@ export const crearInsumo = async (req, res) => {
 export const actualizarCantidad = async (req, res) => {
     try {
         const { id } = req.params;
-        const { cantidad } = req.body; // Esta es la nueva cantidad total
+        const { cantidad } = req.body; // Cantidad total final
 
         const insumo = await insumoRepository.findOneBy({ id: parseInt(id) });
 
@@ -115,8 +123,18 @@ export const actualizarCantidad = async (req, res) => {
             return res.status(404).json({ message: "Insumo no encontrado" });
         }
 
+        const stockAnterior = insumo.cantidad;
         insumo.cantidad = cantidad;
         const resultado = await insumoRepository.save(insumo);
+
+        // --- REGISTRO DE AUDITORÍA (Muestra el cambio exacto) ---
+        registrarLog(
+            req.user?.username || "Administrador",
+            "EDITAR_INSUMO",
+            `Se actualizó el stock de "${insumo.nombre}". Modificación: de ${stockAnterior} a ${cantidad} ${insumo.unidad_medida}`,
+            "Insumo",
+            resultado.id
+        );
         
         res.json(resultado);
     } catch (error) {
@@ -135,7 +153,20 @@ export const eliminarInsumo = async (req, res) => {
             return res.status(404).json({ message: "Insumo no encontrado" });
         }
 
+        const nombreInsumo = insumo.nombre;
+        const idInsumo = insumo.id;
+
         await insumoRepository.remove(insumo);
+
+        // --- REGISTRO DE AUDITORÍA ---
+        registrarLog(
+            req.user?.username || "Administrador",
+            "ELIMINAR_INSUMO",
+            `Se eliminó permanentemente el insumo del catálogo: "${nombreInsumo}"`,
+            "Insumo",
+            idInsumo
+        );
+
         res.json({ message: "Insumo eliminado correctamente" });
     } catch (error) {
         console.error("Error al eliminar insumo:", error);
