@@ -22,3 +22,6 @@ yarn-error.log*
 
 .wwebjs_auth/
 .wwebjs_cache/
+
+# Archivos ejecutables locales
+cloudflare.exe

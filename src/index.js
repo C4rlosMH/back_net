@@ -33,6 +33,8 @@ import cierreRoutes from "./routes/cierre.routes.js"; // <--- IMPORTAR RUTAS DE 
 import gastoRoutes from "./routes/gasto.routes.js";
 import insumoRoutes from "./routes/insumo.routes.js";
 
+import mercadopagoRoutes from "./routes/mercadopago.routes.js";
+
 dotenv.config();
 const app = express();
 
@@ -92,6 +94,9 @@ app.use("/api/whatsapp", whatsappRoutes); // <--- USAR RUTAS DE WHATSAPP
 app.use("/api/cierres", cierreRoutes); // <--- USAR RUTAS DE CIERRE
 app.use("/api/gastos", gastoRoutes);
 app.use("/api/insumos", insumoRoutes);
+
+// La ruta base quedará como: /api/webhooks/mercadopago/webhook
+app.use("/api/webhooks/mercadopago", mercadopagoRoutes);
 
 const PORT = process.env.PORT;
 
