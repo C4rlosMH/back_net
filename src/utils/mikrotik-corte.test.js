@@ -10,16 +10,16 @@ const api = new RouterOSAPI({
 
 async function suspenderCliente(nombreUsuario) {
     try {
-        console.log(`Conectando al MikroTik en ${process.env.MIKROTIK_HOST}...`);
+        //console.log(`Conectando al MikroTik en ${process.env.MIKROTIK_HOST}...`);
         await api.connect();
         
-        console.log(`Buscando al usuario: ${nombreUsuario}`);
+        //console.log(`Buscando al usuario: ${nombreUsuario}`);
 
         // PASO 1: Buscar el ID interno del secret del usuario
         const secrets = await api.write('/ppp/secret/print', [`?name=${nombreUsuario}`]);
         
         if (secrets.length === 0) {
-            console.log('El usuario no existe en la lista de secrets.');
+            //console.log('El usuario no existe en la lista de secrets.');
             api.close();
             return;
         }
@@ -31,7 +31,7 @@ async function suspenderCliente(nombreUsuario) {
             `=.id=${idSecret}`,
             '=disabled=yes' 
         ]);
-        console.log('Secret deshabilitado con éxito. Ya no podrá autenticarse.');
+        //console.log('Secret deshabilitado con éxito. Ya no podrá autenticarse.');
 
         // PASO 3: Buscar si el cliente está conectado ahora mismo y tirarlo
         const sesionesActivas = await api.write('/ppp/active/print', [`?name=${nombreUsuario}`]);
@@ -39,13 +39,13 @@ async function suspenderCliente(nombreUsuario) {
         if (sesionesActivas.length > 0) {
             const idSesion = sesionesActivas[0]['.id'];
             await api.write('/ppp/active/remove', [`=.id=${idSesion}`]);
-            console.log('Sesión activa eliminada. El corte ha sido inmediato.');
+            //console.log('Sesión activa eliminada. El corte ha sido inmediato.');
         } else {
-            console.log('El cliente no estaba conectado en este momento.');
+            //console.log('El cliente no estaba conectado en este momento.');
         }
 
         api.close();
-        console.log('Proceso finalizado.');
+        //console.log('Proceso finalizado.');
 
     } catch (error) {
         console.error('Error de comunicación con MikroTik:', error.message);
