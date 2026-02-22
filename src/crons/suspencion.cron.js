@@ -3,6 +3,8 @@ import { AppDataSource } from "../config/data-source.js";
 import { Cliente } from "../entities/Cliente.js";
 import { SystemLog } from "../entities/SystemLog.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
+// --- IMPORTAMOS EL SERVICIO DE MIKROTIK ---
+import { suspenderClientePPPoE } from "../services/mikrotik.service.js";
 
 const clienteRepo = AppDataSource.getRepository(Cliente);
 const logRepo = AppDataSource.getRepository(SystemLog);
@@ -29,10 +31,19 @@ export const iniciarCronSuspension = () => {
 
                     // Se suspende si la deuda alcanza o supera los 5 MESES (costoPlan * 5).
                     if (deudaCorriente >= (costoPlan * 5) && costoPlan > 0) {
+                        
+                        // 1. Cambiamos el estado en la base de datos
                         cliente.estado = "SUSPENDIDO";
                         await clienteRepo.save(cliente);
                         suspendidosCount++;
 
+                        // 2. Ejecutamos el corte físico en el router MikroTik (Si aplica)
+                        if (cliente.tipo_conexion === 'fibra' && cliente.usuario_pppoe) {
+                            console.log(`[Cron] Ejecutando corte en MikroTik para el usuario: ${cliente.usuario_pppoe}`);
+                            await suspenderClientePPPoE(cliente.usuario_pppoe);
+                        }
+
+                        // 3. Registramos el movimiento
                         const movimientoCorte = movimientoRepo.create({
                             tipo: "CARGO_MENSUAL", 
                             monto: 0,

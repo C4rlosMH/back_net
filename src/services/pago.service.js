@@ -1,6 +1,8 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Cliente } from "../entities/Cliente.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
+// --- IMPORTAMOS EL SERVICIO DE MIKROTIK ---
+import { activarClientePPPoE } from "./mikrotik.service.js";
 
 const clienteRepository = AppDataSource.getRepository(Cliente);
 const movimientoRepository = AppDataSource.getRepository(MovimientoFinanciero);
@@ -66,6 +68,12 @@ export const registrarPagoService = async (data) => {
 
         if (cliente.estado === "CORTADO" || cliente.estado === "SUSPENDIDO") {
             cliente.estado = "ACTIVO";
+            
+            // --- REACTIVACIÓN EN MIKROTIK POR PRÓRROGA ---
+            if (cliente.tipo_conexion === 'fibra' && cliente.usuario_pppoe) {
+                console.log(`[Pagos] Ejecutando reactivación en MikroTik (Prórroga) para: ${cliente.usuario_pppoe}`);
+                await activarClientePPPoE(cliente.usuario_pppoe);
+            }
         }
 
         const aplazamiento = movimientoRepository.create({
@@ -155,6 +163,12 @@ export const registrarPagoService = async (data) => {
     // Reactivar al cliente
     if ((abonoCorriente > 0 || abonoAplazado > 0 || abonoHistorico > 0 || sobrante > 0) && (cliente.estado === "CORTADO" || cliente.estado === "SUSPENDIDO")) {
         cliente.estado = "ACTIVO"; 
+        
+        // --- REACTIVACIÓN EN MIKROTIK POR PAGO ---
+        if (cliente.tipo_conexion === 'fibra' && cliente.usuario_pppoe) {
+            console.log(`[Pagos] Ejecutando reactivación en MikroTik (Abono Recibido) para: ${cliente.usuario_pppoe}`);
+            await activarClientePPPoE(cliente.usuario_pppoe);
+        }
     }
 
     // Logica de Confiabilidad

@@ -4,6 +4,8 @@ import { Equipo } from "../entities/Equipo.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { In } from "typeorm"; 
 import { registrarLog } from "../services/log.service.js"; 
+// --- IMPORTAMOS LOS SERVICIOS DE MIKROTIK ---
+import { suspenderClientePPPoE, activarClientePPPoE } from "../services/mikrotik.service.js";
 
 const clienteRepo = AppDataSource.getRepository(Cliente);
 const equipoRepo = AppDataSource.getRepository(Equipo);
@@ -43,14 +45,11 @@ export const getClientes = async (req, res) => {
             );
         }
 
-        // --- SOLUCIÓN AL ERROR DE ORDENAMIENTO ---
-        // Se utilizan las columnas físicas directas para evitar que el compilador de TypeORM falle.
         const validColumns = ["nombre_completo", "tipo_conexion", "ip_asignada", "estado", "saldo_actual"];
         const columnaReal = validColumns.includes(sortKey) ? `cliente.${sortKey}` : "cliente.nombre_completo";
         
         queryBuilder.orderBy(columnaReal, sortDir);
 
-        // Si se ordenó por conexión, añadimos un orden secundario alfabético
         if (sortKey === "tipo_conexion") {
             queryBuilder.addOrderBy("cliente.nombre_completo", "ASC");
         }
@@ -91,6 +90,13 @@ export const createCliente = async (req, res) => {
             );
         }
 
+        // Si se crea un cliente e inicia inmediatamente como Suspendido/Cortado
+        if (savedCliente.tipo_conexion === 'fibra' && savedCliente.usuario_pppoe) {
+            if (savedCliente.estado === 'SUSPENDIDO' || savedCliente.estado === 'CORTADO') {
+                await suspenderClientePPPoE(savedCliente.usuario_pppoe);
+            }
+        }
+
         registrarLog(
             req.usuario?.nombre || "Administrador", 
             "CREAR_CLIENTE",
@@ -118,6 +124,7 @@ export const updateCliente = async (req, res) => {
         if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
 
         const nombreAnterior = cliente.nombre_completo;
+        const estadoAnterior = cliente.estado; // <--- GUARDAMOS EL ESTADO ANTES DEL CAMBIO
 
         clienteRepo.merge(cliente, {
             ...data,
@@ -125,6 +132,20 @@ export const updateCliente = async (req, res) => {
             caja: cajaId ? { id: cajaId } : null
         });
         await clienteRepo.save(cliente);
+
+        // --- LÓGICA DE CORTES MANUALES EN MIKROTIK ---
+        if (cliente.tipo_conexion === 'fibra' && cliente.usuario_pppoe) {
+            // Evaluamos si hubo un cambio real en el estado para no mandar comandos en vano
+            if (estadoAnterior !== cliente.estado) {
+                if (cliente.estado === 'SUSPENDIDO' || cliente.estado === 'CORTADO') {
+                    console.log(`[Manual] Ejecutando corte en MikroTik para el usuario: ${cliente.usuario_pppoe}`);
+                    await suspenderClientePPPoE(cliente.usuario_pppoe);
+                } else if (cliente.estado === 'ACTIVO') {
+                    console.log(`[Manual] Ejecutando reactivación en MikroTik para el usuario: ${cliente.usuario_pppoe}`);
+                    await activarClientePPPoE(cliente.usuario_pppoe);
+                }
+            }
+        }
 
         if (equiposIds) {
             if (cliente.equipos && cliente.equipos.length > 0) {
@@ -181,6 +202,11 @@ export const deleteCliente = async (req, res) => {
         });
 
         if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
+
+        // --- OPCIONAL: Eliminar del router si borras el cliente (Descomentar si deseas) ---
+        // if (cliente.tipo_conexion === 'fibra' && cliente.usuario_pppoe) {
+        //    await suspenderClientePPPoE(cliente.usuario_pppoe);
+        // }
 
         if (cliente.equipos && cliente.equipos.length > 0) {
             const equiposIds = cliente.equipos.map(e => e.id);

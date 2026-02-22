@@ -25,6 +25,12 @@ export const Cliente = new EntitySchema({
             nullable: true
         },
 
+        usuario_pppoe: {
+            type: "varchar",
+            length: 100,
+            nullable: true
+        },
+
         dia_corte: { type: "int", default: 1 }, 
         saldo_actual: { type: "decimal", precision: 10, scale: 2, default: 0.00 }, 
         fecha_instalacion: { type: "date", nullable: true },
