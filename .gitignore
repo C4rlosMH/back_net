@@ -25,3 +25,7 @@ yarn-error.log*
 
 # Archivos ejecutables locales
 cloudflared.exe
+
+cleanDatabase.js
+datos.csv
+importarClientes.js

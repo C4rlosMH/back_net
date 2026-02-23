@@ -35,7 +35,24 @@ export const Cliente = new EntitySchema({
         saldo_actual: { type: "decimal", precision: 10, scale: 2, default: 0.00 }, 
         fecha_instalacion: { type: "date", nullable: true },
 
-        // --- NUEVOS CAMPOS ---
+        // --- CAMPOS PARA EL PORTAL DE CLIENTES ---
+        numero_suscriptor: {
+            type: "varchar",
+            length: 20,
+            unique: true,
+            nullable: true // Es nullable porque se genera despues en el controlador
+        },
+        password: {
+            type: "varchar",
+            nullable: true,
+            select: false // CRITICO: Evita que la contrasena viaje al panel administrativo
+        },
+        requiere_cambio_password: {
+            type: "boolean",
+            default: true
+        },
+
+        // --- CAMPOS FINANCIEROS Y TECNICOS ---
         confiabilidad: {
             type: "int",
             nullable: true,
@@ -47,11 +64,7 @@ export const Cliente = new EntitySchema({
             default: "fibra" 
         },
         saldo_aplazado: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
-        
-        // ---> NUEVO CAMPO AÑADIDO <---
         deuda_historica: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
-        
-        // --- BOLSA DE SALDO A FAVOR ---
         saldo_a_favor: { type: "decimal", precision: 10, scale: 2, default: 0.00 },
 
         createdAt: { createDate: true },
@@ -60,7 +73,8 @@ export const Cliente = new EntitySchema({
     indices: [
         { columns: ["estado"] },
         { columns: ["dia_pago"] },
-        { columns: ["saldo_actual"] }
+        { columns: ["saldo_actual"] },
+        { columns: ["numero_suscriptor"] } // Indice util para agilizar el login del portal
     ],
 
     relations: {
