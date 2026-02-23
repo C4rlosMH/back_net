@@ -1,72 +1,165 @@
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { AppDataSource } from "../config/data-source.js";
 import { UserSistema } from "../entities/UserSistema.js";
-import { encrypt, compare } from "../utils/handlePassword.js";
-import jwt from "jsonwebtoken";
+import { Cliente } from "../entities/Cliente.js";
 
-const userRepo = AppDataSource.getRepository(UserSistema);
+// =======================================================
+// SERVICIOS PARA USUARIOS DEL SISTEMA (ADMINISTRADORES)
+// =======================================================
 
-// Registro de usuario (Para crear admins/técnicos)
-export const registerUserService = async (userData) => {
-    // 1. Verificar si el usuario ya existe
-    const exists = await userRepo.findOne({ where: { username: userData.username } });
-    if (exists) throw new Error("El nombre de usuario ya está en uso");
-
-    // 2. Encriptar contraseña
-    const passwordHash = await encrypt(userData.password);
+export const registerUserService = async ({ username, password, email }) => {
+    const userRepo = AppDataSource.getRepository(UserSistema);
     
-    // 3. Guardar usuario
+    const existingUser = await userRepo.findOne({ where: { username } });
+    if (existingUser) throw new Error("El usuario ya existe en el sistema.");
+
+    const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = userRepo.create({
-        ...userData,
-        password: passwordHash
+        username,
+        email,
+        password: hashedPassword
+        // Eliminamos la asignacion del rol aqui
     });
-    
-    return await userRepo.save(newUser);
+
+    await userRepo.save(newUser);
+    return newUser;
 };
 
-// Login de usuario
 export const loginService = async ({ username, password }) => {
-    const user = await userRepo.findOne({ where: { username } });
+    const userRepo = AppDataSource.getRepository(UserSistema);
     
-    if (!user) throw new Error("Usuario no encontrado");
-    if (!user.activo) throw new Error("Usuario desactivado. Contacte al administrador.");
-
-    // Verificar contraseña
-    const isCorrect = await compare(password, user.password);
-    if (!isCorrect) throw new Error("Contraseña incorrecta");
-
-    // Generar Token JWT (payload seguro)
-    const tokenPayload = {
-        id: user.id,
-        nombre: user.nombre,
-        username: user.username, // <--- ¡AQUÍ AGREGAMOS EL USERNAME!
-        rol: user.rol
-    };
-
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
-        expiresIn: "8h" // Expira en 8 horas
+    // Eliminamos 'role' del select
+    const user = await userRepo.findOne({
+        where: { username },
+        select: ["id", "username", "password"] 
     });
+
+    if (!user) throw new Error("Credenciales incorrectas.");
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) throw new Error("Credenciales incorrectas.");
+
+    // Al generar el token, le asignamos el rol "ADMIN" por defecto
+    // ya que sabemos que viene de la tabla UserSistema
+    const token = jwt.sign(
+        { 
+            id: user.id, 
+            rol: "ADMIN", 
+            username: user.username 
+        },
+        process.env.JWT_SECRET || "secreto_desarrollo",
+        { expiresIn: "24h" }
+    );
 
     return {
-        user: tokenPayload,
-        token
+        token,
+        user: {
+            id: user.id,
+            username: user.username,
+            role: "ADMIN" // Lo enviamos al front para que tu contexto de React lo lea
+        }
     };
 };
 
-// Cambio de Contraseña (Protegido)
 export const changePasswordService = async (userId, currentPassword, newPassword) => {
-    const user = await userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new Error("Usuario no encontrado");
-
-    // 1. Validar que la contraseña actual sea correcta (Seguridad)
-    const isCorrect = await compare(currentPassword, user.password);
-    if (!isCorrect) throw new Error("La contraseña actual es incorrecta");
-
-    // 2. Encriptar la nueva contraseña
-    const newHash = await encrypt(newPassword);
+    // ... (Este se queda igual, no tenia el campo role)
+    const userRepo = AppDataSource.getRepository(UserSistema);
     
-    // 3. Guardar la nueva contraseña
-    user.password = newHash;
+    const user = await userRepo.findOne({
+        where: { id: userId },
+        select: ["id", "password"]
+    });
+
+    if (!user) throw new Error("Administrador no encontrado.");
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) throw new Error("La contrasena actual es incorrecta.");
+
+    if (newPassword.length < 6) {
+        throw new Error("La nueva contrasena debe tener al menos 6 caracteres.");
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
     await userRepo.save(user);
 
-    return { message: "Contraseña actualizada correctamente" };
+    return { message: "Contrasena de administrador actualizada correctamente." };
+};
+
+// =======================================================
+// SERVICIOS PARA CLIENTES (PORTAL)
+// =======================================================
+
+export const loginClienteService = async ({ numero_suscriptor, password }) => {
+    if (!numero_suscriptor || !password) {
+        throw new Error("El numero de suscriptor y la contrasena son obligatorios.");
+    }
+
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+
+    // Se extraen los campos necesarios, incluyendo el password que está protegido en la entidad
+    const cliente = await clienteRepo.findOne({
+        where: { numero_suscriptor },
+        select: ["id", "numero_suscriptor", "password", "requiere_cambio_password", "nombre_completo", "estado"]
+    });
+
+    if (!cliente) {
+        throw new Error("Credenciales incorrectas.");
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, cliente.password);
+    if (!isPasswordValid) {
+        throw new Error("Credenciales incorrectas.");
+    }
+
+    // Validación extra: no permitir el inicio de sesión si el cliente está dado de baja
+    if (cliente.estado === "BAJA") {
+        throw new Error("El acceso para esta cuenta ha sido deshabilitado.");
+    }
+
+    // Generar el Token JWT firmado para el cliente
+    const token = jwt.sign(
+        { 
+            id: cliente.id, 
+            rol: "CLIENTE",
+            numero_suscriptor: cliente.numero_suscriptor 
+        },
+        process.env.JWT_SECRET || "secreto_desarrollo", 
+        { expiresIn: "24h" }
+    );
+
+    return {
+        token,
+        cliente: {
+            id: cliente.id,
+            nombre_completo: cliente.nombre_completo,
+            numero_suscriptor: cliente.numero_suscriptor,
+            requiere_cambio_password: cliente.requiere_cambio_password,
+            estado: cliente.estado
+        }
+    };
+};
+
+export const changePasswordClienteService = async (clienteId, newPassword) => {
+    if (!newPassword || newPassword.length < 6) {
+        throw new Error("La nueva contrasena debe tener al menos 6 caracteres.");
+    }
+
+    const clienteRepo = AppDataSource.getRepository(Cliente);
+    
+    const cliente = await clienteRepo.findOne({ where: { id: clienteId } });
+    if (!cliente) {
+        throw new Error("Cliente no encontrado.");
+    }
+
+    // Encriptar la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar datos
+    cliente.password = hashedPassword;
+    cliente.requiere_cambio_password = false;
+
+    await clienteRepo.save(cliente);
+
+    return { message: "Contrasena actualizada correctamente. Ya puedes acceder al portal." };
 };

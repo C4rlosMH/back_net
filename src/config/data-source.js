@@ -10,6 +10,7 @@ import { Equipo } from "../entities/Equipo.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { SystemLog } from "../entities/SystemLog.js";
 import { CierreQuincenal } from "../entities/CierreQuincenal.js";
+import { ClienteLog } from "../entities/ClienteLog.js";
 
 // --- NUEVAS IMPORTACIONES ---
 import { Gasto } from "../entities/Gasto.js";
@@ -37,7 +38,8 @@ export const AppDataSource = new DataSource({
         CierreQuincenal,
         // --- AGREGADAS AQUI ---
         Gasto,
-        Insumo
+        Insumo,
+        ClienteLog
     ],
     migrations: [],
     subscribers: [],

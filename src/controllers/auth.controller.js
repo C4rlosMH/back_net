@@ -1,5 +1,5 @@
-import { registerUserService, loginService, changePasswordService } from "../services/auth.service.js";
-import { registrarLog } from "../services/log.service.js"; // <--- Importación
+import { registerUserService, loginService, changePasswordService, loginClienteService, changePasswordClienteService } from "../services/auth.service.js";
+import { registrarLog, registrarLogCliente } from "../services/log.service.js"; // <--- Importación
 
 export const register = async (req, res) => {
     try {
@@ -37,7 +37,7 @@ export const login = async (req, res) => {
     } catch (error) {
         // Opcional: Registrar intentos fallidos de sesión por seguridad
         registrarLog(
-            req.body.username || "Desconocido",
+            req.body.username,
             "LOGIN_FALLIDO",
             "Intento de inicio de sesion fallido (Credenciales incorrectas)",
             "UserSistema",
@@ -61,10 +61,60 @@ export const changePassword = async (req, res) => {
 
         // --- REGISTRO DE LOG ---
         registrarLog(
-            username || "Administrador",
+            username,
             "CAMBIO_PASSWORD",
             "El usuario actualizo su contrasena de acceso",
             "UserSistema",
+            id
+        );
+
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+// --- NUEVO CONTROLADOR PARA CLIENTES ---
+export const loginCliente = async (req, res) => {
+    try {
+        const data = await loginClienteService(req.body);
+        
+        registrarLogCliente(
+            req.body.numero_suscriptor, 
+            "LOGIN_PORTAL_CLIENTE",
+            "Inicio de sesion exitoso en el portal de clientes",
+            "Cliente",
+            data.cliente.id
+        );
+
+        res.json(data);
+    } catch (error) {
+        registrarLogCliente(
+            req.body.numero_suscriptor,
+            "LOGIN_FALLIDO_PORTAL_CLIENTE",
+            "Intento de inicio de sesion fallido en portal (Credenciales incorrectas)",
+            "Cliente",
+            null
+        );
+
+        res.status(401).json({ message: error.message });
+    }
+};
+
+export const changePasswordCliente = async (req, res) => {
+    try {
+        // req.user trae los datos del token decodificado (id, rol, numero_suscriptor)
+        const { id, numero_suscriptor } = req.user; 
+        const { newPassword } = req.body;
+
+        const result = await changePasswordClienteService(id, newPassword);
+
+        // --- REGISTRO DE LOG ---
+        registrarLogCliente(
+            numero_suscriptor,
+            "CAMBIO_PASSWORD_CLIENTE",
+            "El cliente configuro su contrasena personal por primera vez",
+            "Cliente",
             id
         );
 

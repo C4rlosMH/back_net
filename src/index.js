@@ -32,6 +32,7 @@ import whatsappRoutes from "./routes/whatsapp.routes.js"; // <--- IMPORTAR
 import cierreRoutes from "./routes/cierre.routes.js"; // <--- IMPORTAR RUTAS DE CIERRE
 import gastoRoutes from "./routes/gasto.routes.js";
 import insumoRoutes from "./routes/insumo.routes.js";
+import portalRoutes from "./routes/portal.routes.js";
 
 import mercadopagoRoutes from "./routes/mercadopago.routes.js";
 
@@ -94,6 +95,10 @@ app.use("/api/whatsapp", whatsappRoutes); // <--- USAR RUTAS DE WHATSAPP
 app.use("/api/cierres", cierreRoutes); // <--- USAR RUTAS DE CIERRE
 app.use("/api/gastos", gastoRoutes);
 app.use("/api/insumos", insumoRoutes);
+
+
+//Rutas para el portal del cliente (Solo lectura, sin autenticación) - Opcionalmente podrías agregar autenticación con JWT para clientes
+app.use("/api/portal", portalRoutes); // <--- USAR RUTAS DE PORTAL
 
 // La ruta base quedará como: /api/webhooks/mercadopago/webhook
 app.use("/api/webhooks/mercadopago", mercadopagoRoutes);

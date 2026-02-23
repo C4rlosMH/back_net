@@ -1,6 +1,7 @@
 import { AppDataSource } from "../config/data-source.js";
 import { SystemLog } from "../entities/SystemLog.js";
 import { LessThan } from "typeorm"; // Importamos LessThan para filtrar fechas
+import { ClienteLog } from "../entities/ClienteLog.js";
 
 export const registrarLog = async (usuario, accion, detalle, entidad_afectada, id_entidad) => {
     try {
@@ -31,5 +32,22 @@ export const registrarLog = async (usuario, accion, detalle, entidad_afectada, i
         // Usamos un try-catch silencioso para que, si el log falla, 
         // no rompa la operación principal (como crear un cliente o un pago)
         console.error("Error al gestionar logs:", error);
+    }
+};
+
+export const registrarLogCliente = async (numero_suscriptor, accion, descripcion, clienteId = null) => {
+    try {
+        const logRepo = AppDataSource.getRepository(ClienteLog);
+        
+        const nuevoLog = logRepo.create({
+            numero_suscriptor: numero_suscriptor || "Desconocido",
+            accion,
+            descripcion,
+            cliente: clienteId ? { id: clienteId } : null
+        });
+
+        await logRepo.save(nuevoLog);
+    } catch (error) {
+        console.error("Error al registrar el log del cliente:", error);
     }
 };
