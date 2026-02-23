@@ -30,7 +30,7 @@ export const generarLinkDePago = async (cliente, monto, concepto) => {
                 external_reference: cliente.id.toString(), 
                 
                 // Le decimos a MercadoPago a donde enviar la notificacion cuando este pago se complete
-                notification_url: `${process.env.URL_CLOUDFLARE}/api/webhooks/mercadopago/webhook`,
+                notification_url: `${process.env.URL_WEBHOOK}/api/webhooks/mercadopago/webhook`,
                 
                 // Opcional: A donde enviar al cliente despues de pagar
                 back_urls: {
