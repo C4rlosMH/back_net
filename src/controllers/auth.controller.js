@@ -80,22 +80,20 @@ export const loginCliente = async (req, res) => {
         const data = await loginClienteService(req.body);
         
         registrarLogCliente(
-            req.body.numero_suscriptor, 
-            "LOGIN_PORTAL_CLIENTE",
-            "Inicio de sesion exitoso en el portal de clientes",
-            "Cliente",
-            data.cliente.id
-        );
+        cliente.numero_suscriptor, // O la variable que tenga el numero
+        "LOGIN_PORTAL_CLIENTE",
+        "Inicio de sesion exitoso en el portal de clientes",
+        cliente.id // <-- AQUI ESTA EL CAMBIO: Quita las comillas y usa el ID numerico real
+    );
 
         res.json(data);
     } catch (error) {
         registrarLogCliente(
-            req.body.numero_suscriptor,
-            "LOGIN_FALLIDO_PORTAL_CLIENTE",
-            "Intento de inicio de sesion fallido en portal (Credenciales incorrectas)",
-            "Cliente",
-            null
-        );
+        cliente.numero_suscriptor, // O la variable que tenga el numero
+        "LOGIN_PORTAL_CLIENTE",
+        "Inicio de sesion exitoso en el portal de clientes",
+        cliente.id // <-- AQUI ESTA EL CAMBIO: Quita las comillas y usa el ID numerico real
+    );
 
         res.status(401).json({ message: error.message });
     }
