@@ -61,6 +61,7 @@ app.use("/api/", limiter);
 // --- 2. CONFIGURACIÓN DE CORS (Adaptado para Red Local) ---
 const allowedOrigins = [
     'http://localhost:5173', // Tu frontend en modo desarrollo
+    'http://localhost:5174', // Tu frontend en modo desarrollo
     'http://localhost:5000', // Tu frontend compilado con 'serve' local
     process.env.FRONTEND_URL // IP de la red local (Configúralo en tu .env del backend)
 ];

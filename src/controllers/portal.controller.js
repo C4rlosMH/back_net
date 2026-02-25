@@ -1,5 +1,8 @@
-import { getPerfilClienteService, getHistorialPagosService, aplazarPagoService } from "../services/portal.service.js";
+import { getPerfilClienteService, getHistorialPagosService, aplazarPagoService, crearTicketService,
+    getTicketsClienteService, getMensajesTicketService, responderTicketService, actualizarPerfilService,
+    cambiarPasswordService } from "../services/portal.service.js";
 import { generarLinkDePago } from "../services/mercadopago.service.js";
+import ping from 'ping';
 
 export const getPerfilCliente = async (req, res) => {
     try {
@@ -100,5 +103,135 @@ export const aplazarPagoPortal = async (req, res) => {
         res.json(resultado);
     } catch (error) {
         res.status(400).json({ message: error.message });
+    }
+};
+
+export const pingClientePortal = async (req, res) => {
+    try {
+        const { id } = req.user; 
+        
+        // Reutilizamos el servicio que ya tienes para traer los datos del cliente
+        const cliente = await getPerfilClienteService(id);
+
+        if (!cliente.ip_asignada) {
+            return res.status(400).json({ message: "No tienes una IP asignada en el sistema para realizar el test." });
+        }
+
+        // Hacemos el ping a la IP del cliente
+        let resPing = await ping.promise.probe(cliente.ip_asignada, {
+            timeout: 2, // Espera maxima de 2 segundos
+        });
+
+        if (resPing.alive) {
+            // resPing.time devuelve los milisegundos
+            res.json({ ping: Math.round(resPing.time) });
+        } else {
+            res.status(404).json({ message: "Tu equipo no responde. Verifica que este encendido." });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Error interno al realizar el test de red." });
+    }
+};
+
+export const crearTicketPortal = async (req, res) => {
+    try {
+        const { id } = req.user;
+        // Ahora extraemos también la 'prioridad' que envía el nuevo modal
+        const { categoria, asunto, descripcion, prioridad } = req.body;
+
+        // Validación de campos obligatorios
+        if (!categoria || !asunto || !descripcion || !prioridad) {
+            return res.status(400).json({ 
+                message: "Todos los campos, incluyendo la prioridad, son obligatorios." 
+            });
+        }
+
+        // Pasamos el objeto completo al servicio
+        const nuevoTicket = await crearTicketService(id, { 
+            categoria, 
+            asunto, 
+            descripcion, 
+            prioridad // BAJA, MEDIA o ALTA
+        });
+
+        res.status(201).json({ 
+            message: "Ticket creado exitosamente", 
+            ticket: nuevoTicket 
+        });
+    } catch (error) {
+        console.error("Error al crear ticket:", error);
+        res.status(500).json({ 
+            message: "Error interno al crear el ticket." 
+        });
+    }
+};
+export const getTicketsPortal = async (req, res) => {
+    try {
+        const { id } = req.user;
+        const tickets = await getTicketsClienteService(id);
+        res.json(tickets);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener el historial de tickets." });
+    }
+};
+
+export const getMensajesPortal = async (req, res) => {
+    try {
+        const cliente_id = req.user.id;
+        const ticket_id = parseInt(req.params.ticketId);
+
+        const mensajes = await getMensajesTicketService(cliente_id, ticket_id);
+        res.json(mensajes);
+    } catch (error) {
+        res.status(400).json({ message: error.message || "Error al obtener mensajes." });
+    }
+};
+
+export const responderTicketPortal = async (req, res) => {
+    try {
+        const cliente_id = req.user.id;
+        const ticket_id = parseInt(req.params.ticketId);
+        const { mensaje } = req.body;
+
+        if (!mensaje || mensaje.trim() === "") {
+            return res.status(400).json({ message: "El mensaje no puede estar vacio." });
+        }
+
+        const nuevoMensaje = await responderTicketService(cliente_id, ticket_id, mensaje);
+        res.status(201).json({ message: "Respuesta enviada", data: nuevoMensaje });
+    } catch (error) {
+        res.status(400).json({ message: error.message || "Error al enviar la respuesta." });
+    }
+};
+
+export const actualizarPerfilPortal = async (req, res) => {
+    try {
+        const cliente_id = req.user.id;
+        const { email, telefono } = req.body;
+
+        const clienteActualizado = await actualizarPerfilService(cliente_id, { email, telefono });
+        res.json({ message: "Datos actualizados correctamente.", cliente: clienteActualizado });
+    } catch (error) {
+        res.status(400).json({ message: error.message || "Error al actualizar el perfil." });
+    }
+};
+
+export const cambiarPasswordPortal = async (req, res) => {
+    try {
+        const cliente_id = req.user.id;
+        const { password_actual, nueva_password } = req.body;
+
+        if (!password_actual || !nueva_password) {
+            return res.status(400).json({ message: "Debes enviar la contrasena actual y la nueva." });
+        }
+
+        if (nueva_password.length < 6) {
+            return res.status(400).json({ message: "La nueva contrasena debe tener al menos 6 caracteres." });
+        }
+
+        await cambiarPasswordService(cliente_id, password_actual, nueva_password);
+        res.json({ message: "Contrasena actualizada exitosamente." });
+    } catch (error) {
+        res.status(400).json({ message: error.message || "Error al procesar el cambio de contrasena." });
     }
 };

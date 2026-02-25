@@ -79,21 +79,27 @@ export const loginCliente = async (req, res) => {
     try {
         const data = await loginClienteService(req.body);
         
+        // Extraemos 'cliente' del objeto 'data' que devuelve el servicio
+        const cliente = data.cliente;
+        
         registrarLogCliente(
-        cliente.numero_suscriptor, // O la variable que tenga el numero
-        "LOGIN_PORTAL_CLIENTE",
-        "Inicio de sesion exitoso en el portal de clientes",
-        cliente.id // <-- AQUI ESTA EL CAMBIO: Quita las comillas y usa el ID numerico real
-    );
+            cliente.numero_suscriptor, 
+            "LOGIN_PORTAL_CLIENTE",
+            "Inicio de sesion exitoso en el portal de clientes",
+            cliente.id
+        );
 
         res.json(data);
     } catch (error) {
+        // Si falla el login, capturamos el numero de suscriptor que intentó ingresar desde req.body
+        const numeroIntentado = req.body.numero_suscriptor || "Usuario Desconocido";
+
         registrarLogCliente(
-        cliente.numero_suscriptor, // O la variable que tenga el numero
-        "LOGIN_PORTAL_CLIENTE",
-        "Inicio de sesion exitoso en el portal de clientes",
-        cliente.id // <-- AQUI ESTA EL CAMBIO: Quita las comillas y usa el ID numerico real
-    );
+            numeroIntentado, 
+            "LOGIN_PORTAL_CLIENTE_FALLIDO",
+            "Intento de inicio de sesion fallido",
+            null // Pasamos null porque no hay ID de cliente válido
+        );
 
         res.status(401).json({ message: error.message });
     }

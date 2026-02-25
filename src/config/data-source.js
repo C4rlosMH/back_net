@@ -11,6 +11,8 @@ import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { SystemLog } from "../entities/SystemLog.js";
 import { CierreQuincenal } from "../entities/CierreQuincenal.js";
 import { ClienteLog } from "../entities/ClienteLog.js";
+import { Ticket } from "../entities/Ticket.js";
+import { TicketMensaje } from "../entities/TicketMensaje.js";
 
 // --- NUEVAS IMPORTACIONES ---
 import { Gasto } from "../entities/Gasto.js";
@@ -39,7 +41,9 @@ export const AppDataSource = new DataSource({
         // --- AGREGADAS AQUI ---
         Gasto,
         Insumo,
-        ClienteLog
+        ClienteLog,
+        Ticket,
+        TicketMensaje
     ],
     migrations: [],
     subscribers: [],
