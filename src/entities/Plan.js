@@ -9,6 +9,7 @@ export const Plan = new EntitySchema({
         velocidad_mb: { type: "int" },
         precio_mensual: { type: "decimal", precision: 10, scale: 2 },
         activo: { type: "boolean", default: true },
+        visible_web: { type: "boolean", default: true },
     },
     relations: {
         clientes: {

@@ -3,7 +3,7 @@ import {
     login, 
     changePassword, 
     loginCliente, 
-    changePasswordCliente // <-- Nueva importacion
+    changePasswordCliente, solicitarRecuperacion, restablecerPassword // <-- Nueva importacion
 } from "../controllers/auth.controller.js";
 import { checkAuth, checkRole } from "../middlewares/auth.middleware.js";
 
@@ -18,5 +18,8 @@ router.post("/change-password", checkAuth, checkRole(["ADMIN"]), changePassword)
 
 // --- Rutas Privadas (Requieren Token de Cliente) ---
 router.post("/cliente/change-password", checkAuth, checkRole(["CLIENTE"]), changePasswordCliente);
+
+router.post("/forgot-password", solicitarRecuperacion);
+router.post("/reset-password", restablecerPassword);
 
 export default router;

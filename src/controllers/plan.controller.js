@@ -90,3 +90,18 @@ export const updatePlan = async (req, res) => {
         return res.status(500).json({ message: error.message });
     }
 };
+
+export const getPlanesWeb = async (req, res) => {
+    try {
+        const planes = await planRepo.find({ 
+            where: { 
+                activo: true, 
+                visible_web: true 
+            },
+            order: { precio_mensual: "ASC" } 
+        });
+        res.json(planes);
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
