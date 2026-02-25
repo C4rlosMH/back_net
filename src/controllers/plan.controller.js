@@ -1,8 +1,10 @@
 import { AppDataSource } from "../config/data-source.js";
 import { Plan } from "../entities/Plan.js";
 import { registrarLog } from "../services/log.service.js"; // <--- Importación
+import { Cliente } from "../entities/Cliente.js";
 
 const planRepo = AppDataSource.getRepository(Plan);
+const clienteRepo = AppDataSource.getRepository(Cliente);
 
 export const getPlanes = async (req, res) => {
     try {
@@ -93,14 +95,35 @@ export const updatePlan = async (req, res) => {
 
 export const getPlanesWeb = async (req, res) => {
     try {
-        const planes = await planRepo.find({ 
-            where: { 
-                activo: true, 
-                visible_web: true 
-            },
-            order: { precio_mensual: "ASC" } 
-        });
+        const planes = await planRepo
+            .createQueryBuilder("plan")
+            .where("plan.activo = :activo", { activo: true })
+            .andWhere("plan.visible_web = :visible_web", { visible_web: true })
+            // Esta función "mapea" dinámicamente cuántos clientes en estado ACTIVO tienen este plan
+            .loadRelationCountAndMap(
+                "plan.cantidad_clientes", 
+                "plan.clientes", 
+                "cliente", 
+                (qb) => qb.where("cliente.estado = :estado", { estado: "ACTIVO" })
+            )
+            .orderBy("plan.precio_mensual", "ASC")
+            .getMany();
+
         res.json(planes);
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+// --- NUEVO: Endpoint para estadísticas públicas (Clientes Totales) ---
+export const getPublicStats = async (req, res) => {
+    try {
+        // Cuenta exactamente cuántos clientes en la BD tienen estado 'ACTIVO'
+        const clientesActivos = await clienteRepo.count({
+            where: { estado: "ACTIVO" }
+        });
+
+        res.json({ clientesActivos });
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
