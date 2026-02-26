@@ -3,12 +3,14 @@ import { Cliente } from "../entities/Cliente.js";
 import { MovimientoFinanciero } from "../entities/MovimientoFinanciero.js";
 import { Equipo } from "../entities/Equipo.js";
 import { SystemLog } from "../entities/SystemLog.js";
+import { Ticket } from "../entities/Ticket.js"; // <--- Importación de Ticket
 import { Between, In } from "typeorm";
 
 const clienteRepo = AppDataSource.getRepository(Cliente);
 const movimientoRepo = AppDataSource.getRepository(MovimientoFinanciero);
 const equipoRepo = AppDataSource.getRepository(Equipo);
 const logRepo = AppDataSource.getRepository(SystemLog);
+const ticketRepo = AppDataSource.getRepository(Ticket); // <--- Repositorio de Ticket
 
 export const getDashboardStatsService = async () => {
     const hoy = new Date();
@@ -136,7 +138,7 @@ export const getDashboardStatsService = async () => {
     todosLosAbonos.forEach(m => {
         const d = new Date(m.fecha);
         const y = d.getFullYear();
-        const mo = d.getMonth(); // 0 a 11
+        const mo = d.getMonth(); 
         
         if (!datosPorAnio[mo]) datosPorAnio[mo] = { name: mesesNombres[mo] };
         if (!datosPorAnio[mo][y]) datosPorAnio[mo][y] = 0;
@@ -148,7 +150,6 @@ export const getDashboardStatsService = async () => {
     const comparativaAnual = [];
     const listaAnios = Array.from(aniosPresentes).sort();
     
-    // Rellenamos para que siempre devuelva los 12 meses
     for (let i = 0; i < 12; i++) {
         const mesData = datosPorAnio[i] || { name: mesesNombres[i] };
         listaAnios.forEach(a => {
@@ -156,6 +157,17 @@ export const getDashboardStatsService = async () => {
         });
         comparativaAnual.push(mesData);
     }
+
+    // --- 8. TICKETS ACTIVOS PARA EL DASHBOARD ---
+    const ticketsActivos = await ticketRepo.find({
+        where: [
+            { estado: "ABIERTO" },
+            { estado: "EN_PROGRESO" }
+        ],
+        relations: ["cliente"], 
+        order: { fecha_creacion: "DESC" }, 
+        take: 5 
+    });
 
     return {
         financiero: {
@@ -171,7 +183,8 @@ export const getDashboardStatsService = async () => {
         },
         alertas: {
             vencimientos_hoy: vencimientosPendientes,
-            actividad_reciente: actividadReciente
+            actividad_reciente: actividadReciente,
+            tickets_activos: ticketsActivos // <--- Añadimos los tickets al objeto alertas
         },
         pendientes_pago: { total_deuda: deudaTotalReales, lista: listaPendientes },
         clientes: { 
@@ -180,6 +193,6 @@ export const getDashboardStatsService = async () => {
         },
         inventario_disponible: { routers: stockRouter, antenas: stockAntena, onus: stockOnu },
         graficaIngresos: graficaIngresos,
-        comparativaAnual: { datos: comparativaAnual, anios: listaAnios } // Agregado aquí
+        comparativaAnual: { datos: comparativaAnual, anios: listaAnios } 
     };
 };

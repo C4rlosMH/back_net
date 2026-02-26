@@ -17,20 +17,21 @@ export const getPlanes = async (req, res) => {
 
 export const createPlan = async (req, res) => {
     try {
-        const { nombre, precio_mensual, velocidad_mb } = req.body;
+        const { nombre, precio_mensual, velocidad_mb, visible_web } = req.body;
         
         const plan = planRepo.create({
             nombre,
             precio_mensual: parseFloat(precio_mensual),
             velocidad_mb: parseInt(velocidad_mb),
-            activo: true
+            activo: true,
+            visible_web: visible_web !== undefined ? visible_web : true // Agregado aquí
         });
 
         await planRepo.save(plan);
 
         // --- REGISTRO DE LOG ---
         registrarLog(
-            req.user?.username || "Administrador",
+            req.user?.username,
             "CREAR_PLAN",
             `Se creo el plan de internet: ${nombre} (${velocidad_mb} Mbps por $${precio_mensual})`,
             "Plan",
@@ -55,7 +56,7 @@ export const togglePlan = async (req, res) => {
 
         // --- REGISTRO DE LOG ---
         registrarLog(
-            req.user?.username || "Administrador",
+            req.user?.username,
             "ESTADO_PLAN",
             `Se marco el plan "${plan.nombre}" como ${plan.activo ? 'ACTIVO' : 'INACTIVO'}`,
             "Plan",
@@ -80,7 +81,7 @@ export const updatePlan = async (req, res) => {
 
         // --- REGISTRO DE LOG ---
         registrarLog(
-            req.user?.username || "Administrador",
+            req.user?.username,
             "ACTUALIZAR_PLAN",
             `Se modificaron los detalles del plan: ${plan.nombre}`,
             "Plan",
@@ -124,6 +125,31 @@ export const getPublicStats = async (req, res) => {
         });
 
         res.json({ clientesActivos });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+export const toggleWebPlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const plan = await planRepo.findOneBy({ id: parseInt(id) });
+
+        if (!plan) return res.status(404).json({ message: "Plan no encontrado" });
+
+        plan.visible_web = !plan.visible_web;
+        await planRepo.save(plan);
+
+        // --- REGISTRO DE LOG ---
+        registrarLog(
+            req.user?.username,
+            "VISIBILIDAD_PLAN",
+            `Se cambio la visibilidad web del plan "${plan.nombre}" a ${plan.visible_web ? 'VISIBLE' : 'OCULTO'}`,
+            "Plan",
+            plan.id
+        );
+
+        res.json(plan);
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }

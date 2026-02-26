@@ -2,11 +2,16 @@ import { getPerfilClienteService, getHistorialPagosService, aplazarPagoService, 
     getTicketsClienteService, getMensajesTicketService, responderTicketService, actualizarPerfilService,
     cambiarPasswordService } from "../services/portal.service.js";
 import { generarLinkDePago } from "../services/mercadopago.service.js";
+import { Ticket } from "../entities/Ticket.js";
+import { TicketMensaje } from "../entities/TicketMensaje.js";
+import { AppDataSource } from "../config/data-source.js"; // IMPORTACIÓN AGREGADA
 import ping from 'ping';
+
+const ticketRepo = AppDataSource.getRepository(Ticket);
+const mensajeRepo = AppDataSource.getRepository(TicketMensaje);
 
 export const getPerfilCliente = async (req, res) => {
     try {
-        // El id viene inyectado de forma segura desde el JWT gracias al middleware checkAuth
         const { id } = req.user; 
         
         const perfil = await getPerfilClienteService(id);
@@ -17,11 +22,9 @@ export const getPerfilCliente = async (req, res) => {
     }
 };
 
-// NUEVA FUNCIÓN: Generar pago seguro para el cliente
 export const generarPagoPortal = async (req, res) => {
     try {
         const { id } = req.user; 
-        // El frontend nos dirá qué opción eligió el cliente
         const { tipo_pago, monto_personalizado } = req.body; 
         
         const cliente = await getPerfilClienteService(id);
@@ -30,7 +33,6 @@ export const generarPagoPortal = async (req, res) => {
         let montoAPagar = 0;
         let concepto = "";
 
-        // Evaluamos la opción seleccionada por el cliente
         switch (tipo_pago) {
             case "DEUDA_TOTAL":
                 if (deudaTotal <= 0) {
@@ -41,7 +43,6 @@ export const generarPagoPortal = async (req, res) => {
                 break;
 
             case "MENSUALIDAD":
-                // Pagar el mes por adelantado o su tarifa base si no tiene deuda acumulada
                 if (!cliente.plan) {
                     return res.status(400).json({ message: "No tienes un plan asignado." });
                 }
@@ -50,7 +51,6 @@ export const generarPagoPortal = async (req, res) => {
                 break;
 
             case "OTRO_MONTO":
-                // El cliente decide cuánto abonar
                 if (!monto_personalizado || Number(monto_personalizado) < 20) {
                     return res.status(400).json({ message: "El monto minimo para abonar es de $20.00" });
                 }
@@ -62,10 +62,8 @@ export const generarPagoPortal = async (req, res) => {
                 return res.status(400).json({ message: "Tipo de pago no valido." });
         }
 
-        // Generamos el link con TU servicio de Mercado Pago usando el monto calculado
         const url_pago = await generarLinkDePago(cliente, montoAPagar, concepto);
 
-        // Devolvemos la URL al frontend para que redireccione al cliente
         res.json({ url_pago, monto_a_pagar: montoAPagar });
 
     } catch (error) {
@@ -79,7 +77,6 @@ export const getHistorialPagos = async (req, res) => {
         
         const historial = await getHistorialPagosService(id);
         
-        // Devolvemos el arreglo de pagos (puede estar vacio si es un cliente nuevo)
         res.json(historial);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -92,7 +89,6 @@ export const aplazarPagoPortal = async (req, res) => {
 
         const resultado = await aplazarPagoService(id);
 
-        // Dejamos evidencia en el panel de auditoria
         registrarLogCliente(
             numero_suscriptor,
             "APLAZAMIENTO_PAGO",
@@ -110,20 +106,17 @@ export const pingClientePortal = async (req, res) => {
     try {
         const { id } = req.user; 
         
-        // Reutilizamos el servicio que ya tienes para traer los datos del cliente
         const cliente = await getPerfilClienteService(id);
 
         if (!cliente.ip_asignada) {
             return res.status(400).json({ message: "No tienes una IP asignada en el sistema para realizar el test." });
         }
 
-        // Hacemos el ping a la IP del cliente
         let resPing = await ping.promise.probe(cliente.ip_asignada, {
-            timeout: 2, // Espera maxima de 2 segundos
+            timeout: 2, 
         });
 
         if (resPing.alive) {
-            // resPing.time devuelve los milisegundos
             res.json({ ping: Math.round(resPing.time) });
         } else {
             res.status(404).json({ message: "Tu equipo no responde. Verifica que este encendido." });
@@ -136,22 +129,19 @@ export const pingClientePortal = async (req, res) => {
 export const crearTicketPortal = async (req, res) => {
     try {
         const { id } = req.user;
-        // Ahora extraemos también la 'prioridad' que envía el nuevo modal
         const { categoria, asunto, descripcion, prioridad } = req.body;
 
-        // Validación de campos obligatorios
         if (!categoria || !asunto || !descripcion || !prioridad) {
             return res.status(400).json({ 
                 message: "Todos los campos, incluyendo la prioridad, son obligatorios." 
             });
         }
 
-        // Pasamos el objeto completo al servicio
         const nuevoTicket = await crearTicketService(id, { 
             categoria, 
             asunto, 
             descripcion, 
-            prioridad // BAJA, MEDIA o ALTA
+            prioridad 
         });
 
         res.status(201).json({ 
@@ -165,11 +155,42 @@ export const crearTicketPortal = async (req, res) => {
         });
     }
 };
+
 export const getTicketsPortal = async (req, res) => {
     try {
         const { id } = req.user;
-        const tickets = await getTicketsClienteService(id);
-        res.json(tickets);
+        
+        // 1. Obtenemos todos los tickets del cliente
+        const tickets = await ticketRepo.find({
+            where: { cliente: { id: id } }
+        });
+
+        // 2. Mapeamos cada ticket para buscar su último mensaje
+        const ticketsConNotificacion = await Promise.all(tickets.map(async (ticket) => {
+            const ultimoMensaje = await mensajeRepo.findOne({
+                where: { ticket: { id: ticket.id } },
+                order: { fecha_creacion: "DESC" }
+            });
+
+            // 3. Calculamos la fecha real de última actividad
+            const fechaActividad = ultimoMensaje 
+                ? (new Date(ultimoMensaje.fecha_creacion) > new Date(ticket.fecha_actualizacion) 
+                    ? ultimoMensaje.fecha_creacion 
+                    : ticket.fecha_actualizacion)
+                : ticket.fecha_actualizacion;
+
+            return {
+                ...ticket,
+                // Si el último mensaje es del ADMIN y el ticket no está cerrado, hay novedad para el cliente
+                tiene_mensajes_nuevos: ultimoMensaje && ultimoMensaje.remitente === "ADMIN" && ticket.estado !== "CERRADO" && ticket.estado !== "RESUELTO",
+                fecha_actividad: fechaActividad
+            };
+        }));
+
+        // 4. Ordenamos: Los que tienen actividad más reciente van arriba
+        ticketsConNotificacion.sort((a, b) => new Date(b.fecha_actividad) - new Date(a.fecha_actividad));
+
+        res.json(ticketsConNotificacion);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener el historial de tickets." });
     }
@@ -233,5 +254,41 @@ export const cambiarPasswordPortal = async (req, res) => {
         res.json({ message: "Contrasena actualizada exitosamente." });
     } catch (error) {
         res.status(400).json({ message: error.message || "Error al procesar el cambio de contrasena." });
+    }
+};
+
+export const calificarTicketPortal = async (req, res) => {
+    try {
+        const { ticketId } = req.params; 
+        const { calificacion, comentario } = req.body;
+        const cliente_id = req.user.id; 
+
+        const ticket = await ticketRepo.findOne({ 
+            where: { 
+                id: parseInt(ticketId),
+                cliente: { id: cliente_id } 
+            } 
+        });
+
+        if (!ticket) {
+            return res.status(404).json({ message: "Ticket no encontrado o no te pertenece" });
+        }
+
+        if (ticket.estado !== "CERRADO" && ticket.estado !== "RESUELTO") {
+            return res.status(400).json({ message: "Solo se pueden calificar tickets que ya están cerrados." });
+        }
+
+        if (calificacion < 1 || calificacion > 5) {
+            return res.status(400).json({ message: "La calificación debe ser entre 1 y 5." });
+        }
+
+        ticket.calificacion = parseInt(calificacion);
+        ticket.comentario_calificacion = comentario || null;
+
+        await ticketRepo.save(ticket);
+
+        return res.json({ message: "Calificación guardada exitosamente", ticket });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
     }
 };

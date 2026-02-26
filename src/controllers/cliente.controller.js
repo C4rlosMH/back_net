@@ -6,6 +6,9 @@ import { In } from "typeorm";
 import { registrarLog } from "../services/log.service.js"; 
 // --- IMPORTAMOS LOS SERVICIOS DE MIKROTIK ---
 import { suspenderClientePPPoE, activarClientePPPoE } from "../services/mikrotik.service.js";
+import { encrypt } from "../utils/handlePassword.js";
+import { ClienteLog } from "../entities/ClienteLog.js";
+import { Ticket } from "../entities/Ticket.js";
 
 const clienteRepo = AppDataSource.getRepository(Cliente);
 const equipoRepo = AppDataSource.getRepository(Equipo);
@@ -98,7 +101,7 @@ export const createCliente = async (req, res) => {
         }
 
         registrarLog(
-            req.usuario?.nombre || "Administrador", 
+            req.usuario?.nombre, 
             "CREAR_CLIENTE",
             `Se registro el nuevo cliente: ${savedCliente.nombre_completo}`,
             "Cliente",
@@ -165,7 +168,7 @@ export const updateCliente = async (req, res) => {
         }
 
         registrarLog(
-            req.usuario?.nombre || "Administrador",
+            req.usuario?.nombre,
             "ACTUALIZAR_CLIENTE",
             `Se actualizo el perfil o estado del cliente: ${nombreAnterior}`,
             "Cliente",
@@ -220,7 +223,7 @@ export const deleteCliente = async (req, res) => {
         await clienteRepo.delete({ id: parseInt(id) });
         
         registrarLog(
-            req.usuario?.nombre || "Administrador",
+            req.usuario?.nombre,
             "ELIMINAR_CLIENTE",
             `Se elimino definitivamente al cliente: ${cliente.nombre_completo}`,
             "Cliente",
@@ -230,6 +233,73 @@ export const deleteCliente = async (req, res) => {
         return res.sendStatus(204);
     } catch (error) {
         console.error("Error al eliminar cliente:", error);
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+export const resetPasswordPortal = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const cliente = await clienteRepo.findOneBy({ id: parseInt(id) });
+        
+        if (!cliente) return res.status(404).json({ message: "Cliente no encontrado" });
+
+        // Generar una contraseña aleatoria de 8 caracteres (letras y números)
+        const nuevaPassword = Math.random().toString(36).slice(-8);
+        
+        // Encriptar y actualizar en la base de datos
+        cliente.password = await encrypt(nuevaPassword);
+        cliente.requiere_cambio_password = true;
+        await clienteRepo.save(cliente);
+
+        // Registrar el movimiento en el log del sistema
+        registrarLog(
+            req.user?.username,
+            "RESET_PASSWORD",
+            `Se restablecio la contrasena del portal para el cliente: ${cliente.nombre_completo}`,
+            "Cliente",
+            cliente.id
+        );
+
+        // Devolver la contraseña en texto plano SOLO esta vez para que el admin la vea
+        res.json({ message: "Contraseña restablecida", password: nuevaPassword });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+// Obtener los últimos 10 logs del cliente
+export const getClienteLogs = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const logRepo = AppDataSource.getRepository(ClienteLog);
+        
+        const logs = await logRepo.find({
+            where: { cliente: { id: parseInt(id) } },
+            order: { fecha: "DESC" },
+            take: 10 // Solo los últimos 10
+        });
+        
+        res.json(logs);
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+// Obtener todos los tickets del cliente
+export const getClienteTickets = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ticketRepo = AppDataSource.getRepository(Ticket);
+        
+        const tickets = await ticketRepo.find({
+            // Ojo: en tu entidad Ticket la columna se llama cliente_id directamente
+            where: { cliente_id: parseInt(id) }, 
+            order: { fecha_creacion: "DESC" }
+        });
+        
+        res.json(tickets);
+    } catch (error) {
         return res.status(500).json({ message: error.message });
     }
 };
